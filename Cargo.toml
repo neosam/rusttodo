@@ -1,0 +1,8 @@
+[package]
+name = "rusttodo"
+version = "0.1.0"
+authors = ["Simon Goller <neosam+github@posteo.de>"]
+
+[dependencies]
+time = "0.1"
+rand = "0.3"

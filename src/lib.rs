@@ -120,6 +120,14 @@ impl TaskStat {
     }
 
 
+    fn renew_p_task(&mut self, title: &String) {
+        match self.pool.get_mut(title) {
+            Some(p_task) => {
+                p_task.cooling_until = self.ref_tm +
+                    Duration::days(p_task.cool_down as i64)}
+            None => ()
+        }
+    }
 }
 
 impl TaskStatTrait for TaskStat {
@@ -175,7 +183,13 @@ impl TaskStatTrait for TaskStat {
     }
 
     fn mark_done(&mut self, title: String) -> bool {
-        return false;
+        if !self.active.contains_key(&title) {
+            false
+        } else {
+            self.active.remove(&title);
+            self.renew_p_task(&title);
+            true
+        }
     }
 
     fn all_actives(&self) -> Vec<ActiveTask> {
@@ -264,5 +278,18 @@ mod tests {
         assert_eq!(true, actives.contains_key(&"task a".to_string()));
         assert_eq!(false, actives.contains_key(&"task b".to_string()));
         assert_eq!(true, actives.contains_key(&"task c".to_string()));
+        // todo test other creteria
+    }
+
+    #[test]
+    fn mark_done_test () {
+        let mut task_stat = TaskStat::empty_task_stat();
+        task_stat.add_pooled_task("task a".to_string(), "".to_string(),
+                                  1.0, 0.2, 1, 2);
+        task_stat.add_active_task("task a".to_string(), "".to_string(),
+                                  1.0, 3);
+        assert_eq!(false, task_stat.mark_done("task b".to_string()));
+        assert_eq!(true, task_stat.mark_done("task a".to_string()));
+        assert_eq!(false, task_stat.mark_done("task b".to_string()));
     }
 }

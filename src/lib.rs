@@ -5,8 +5,7 @@ extern crate time;
 extern crate rand;
 
 use time::Duration;
-use std::collections::btree_map::BTreeMap;
-use rand::random;
+use std::collections::BTreeMap;
 
 pub type FactorT = f32;
 pub type CooldownT = i16;
@@ -38,11 +37,10 @@ pub struct PooledTask {
 }
 
 /// Overall state of the tasks
-pub struct TaskStat<R: rand::Rng> {
+pub struct TaskStat {
     pub active: BTreeMap<String, ActiveTask>,
     pool: BTreeMap<String, PooledTask>,
     ref_tm: time::Tm,
-    rnd: R
 }
 
 
@@ -65,29 +63,28 @@ trait TaskStatTrait {
     fn add_pooled_task(&mut self, title: String, description: String,
                        factor: FactorT, propability: FactorT,
                        cool_down: CooldownT, due_days: DueDaysT);
-    fn activate(&mut self);
+    fn activate<R: rand::Rng>(&mut self, rng: &mut R);
     fn mark_done(&mut self, title: String) -> bool;
     fn all_actives(&self) -> Vec<ActiveTask>;
     fn all_pooled(&self) -> Vec<PooledTask>;
 }
 
 /// Task stat implementation
-impl<R: rand::Rng> TaskStat<R> {
+impl TaskStat {
     /// Generate a new and empty task stat
-    pub fn empty_task_stat() -> TaskStat<rand::ThreadRng> {
+    pub fn empty_task_stat() -> TaskStat {
         TaskStat {
             active: BTreeMap::new(),
             pool: BTreeMap::new(),
-            ref_tm: time::now(),
-            rnd: rand::thread_rng()
+            ref_tm: time::now()
         }
     }
 
 
-    fn pick_random_from_pool(&mut self) -> Vec<&PooledTask>{
+    fn pick_random_from_pool<R: rand::Rng>(&self, rng: &mut R) -> Vec<&PooledTask>{
         let mut result = Vec::new();
         for (_, p_task) in self.pool.iter() {
-            let rand_num : f32 = self.rnd.next_f32();
+            let rand_num : f32 = rng.next_f32();
             if rand_num < p_task.propability {
                 result.push(p_task);
             }
@@ -96,7 +93,7 @@ impl<R: rand::Rng> TaskStat<R> {
     }
 
     fn is_p_task_active(&self, p_task: &PooledTask) -> bool {
-        self.pool.contains_key(&p_task.title_string())
+        self.active.contains_key(&p_task.title_string())
     }
 
     fn is_p_task_cooling_down(&self, p_task: &PooledTask) -> bool {
@@ -125,15 +122,11 @@ impl<R: rand::Rng> TaskStat<R> {
 
 }
 
-impl<R: rand::Rng> TaskStatTrait for TaskStat<R> {
-    fn activate(&mut self) {
+impl TaskStatTrait for TaskStat {
+    fn activate<R: rand::Rng>(&mut self, r: &mut R) {
         let mut insert_tasks = Vec::new();
-        let p_tasks;
         {
-            let p_tasks_= self.pick_random_from_pool();
-            p_tasks = p_tasks_.clone();
-        }
-        {
+            let p_tasks = self.pick_random_from_pool(r);
             for p_task in p_tasks {
                 if self.can_activate(p_task) {
                     insert_tasks.push(p_task.clone());
@@ -200,6 +193,41 @@ impl<R: rand::Rng> TaskStatTrait for TaskStat<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand;
+    use rand::Rng;
+    use TaskStatTrait;
+    use std::collections::BTreeMap;
+
+    struct TestRand {
+        i: usize,
+        vals: Vec<u32>,
+        vals_f: Vec<f32>
+    }
+
+    impl rand::Rng for TestRand {
+        fn next_u32(&mut self) -> u32 {
+            0
+        }
+
+        fn next_f32(&mut self) -> f32 {
+            let index = self.i % self.vals_f.len();
+            self.i += 1;
+            self.vals_f[index]
+        }
+    }
+
+    #[test]
+    fn test_random() {
+        let mut rng = TestRand {
+            i: 0,
+            vals: vec![0, 1, 2],
+            vals_f: vec![0.0, 0.2, 0.5]
+        };
+        assert_eq!(0.0, rng.next_f32());
+        assert_eq!(0.2, rng.next_f32());
+        assert_eq!(0.5, rng.next_f32());
+        assert_eq!(0.0, rng.next_f32());
+    }
 
     #[test]
     fn basic_insert_test() {
@@ -210,5 +238,31 @@ mod tests {
 
         assert_eq!(1, task_stat.active.len());
         assert_eq!(1, task_stat.pool.len());
+    }
+
+    fn default_rng() -> TestRand {
+        TestRand {
+            i: 0,
+            vals: vec![0, 1, 2],
+            vals_f: vec![0.0, 0.2, 0.5, 0.7]
+        }
+    }
+
+    #[test]
+    fn random_activate_test () {
+        // create a fake ranom generator where we know the results
+        let mut rng = default_rng();
+        let mut task_stat = TaskStat::empty_task_stat();
+        task_stat.add_pooled_task("task a".to_string(), "".to_string(),
+                                  1.0, 0.2, 1, 2);
+        task_stat.add_pooled_task("task b".to_string(), "".to_string(),
+                                  1.0, 0.1, 2, 3);
+        task_stat.add_pooled_task("task c".to_string(), "".to_string(),
+                                  1.0, 0.7, 0, 1);
+        task_stat.activate(&mut rng);
+        let actives : BTreeMap<String, ActiveTask> = task_stat.active;
+        assert_eq!(true, actives.contains_key(&"task a".to_string()));
+        assert_eq!(false, actives.contains_key(&"task b".to_string()));
+        assert_eq!(true, actives.contains_key(&"task c".to_string()));
     }
 }

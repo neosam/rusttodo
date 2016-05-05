@@ -14,33 +14,33 @@ pub type DueDaysT = i16;
 /// Base task type
 #[derive(Clone)]
 pub struct Task {
-    title: String,
-    description: String,
-    factor: FactorT
+    pub title: String,
+    pub description: String,
+    pub factor: FactorT
 }
 
 /// A task which got activated.
 #[derive(Clone)]
 pub struct ActiveTask {
-    task: Task,
-    due: time::Tm
+    pub task: Task,
+    pub due: time::Tm
 }
 
 /// A task which is about to get activated
 #[derive(Clone)]
 pub struct PooledTask {
-    task: Task,
-    propability: FactorT,
-    cool_down: CooldownT,
-    due_days: DueDaysT,
-    cooling_until: time::Tm
+    pub task: Task,
+    pub propability: FactorT,
+    pub cool_down: CooldownT,
+    pub due_days: DueDaysT,
+    pub cooling_until: time::Tm
 }
 
 /// Overall state of the tasks
 pub struct TaskStat {
     pub active: BTreeMap<String, ActiveTask>,
-    pool: BTreeMap<String, PooledTask>,
-    ref_tm: time::Tm,
+    pub pool: BTreeMap<String, PooledTask>,
+    pub ref_tm: time::Tm,
 }
 
 
@@ -57,13 +57,13 @@ impl ActiveTask {
     }
 }
 
-trait TaskStatTrait {
+pub trait TaskStatTrait {
     fn add_active_task(&mut self, title: String, description: String,
-                       factor: FactorT, due_days: i16);
+                       factor: FactorT, due_days: i16) -> ActiveTask;
     fn add_pooled_task(&mut self, title: String, description: String,
                        factor: FactorT, propability: FactorT,
-                       cool_down: CooldownT, due_days: DueDaysT);
-    fn activate<R: rand::Rng>(&mut self, rng: &mut R);
+                       cool_down: CooldownT, due_days: DueDaysT) -> PooledTask;
+    fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Vec<ActiveTask>;
     fn mark_done(&mut self, title: String) -> bool;
     fn all_actives(&self) -> Vec<ActiveTask>;
     fn all_pooled(&self) -> Vec<PooledTask>;
@@ -114,9 +114,10 @@ impl TaskStat {
         }
     }
 
-    fn activate_p_task(&mut self, p_task: &PooledTask) {
+    fn activate_p_task(&mut self, p_task: &PooledTask) -> ActiveTask {
         let a_task = self.p_to_a_task(p_task);
-        self.active.insert(a_task.title_string(), a_task);
+        self.active.insert(a_task.title_string(), a_task.clone());
+        a_task
     }
 
 
@@ -131,8 +132,9 @@ impl TaskStat {
 }
 
 impl TaskStatTrait for TaskStat {
-    fn activate<R: rand::Rng>(&mut self, r: &mut R) {
+    fn activate<R: rand::Rng>(&mut self, r: &mut R) -> Vec<ActiveTask>{
         let mut insert_tasks = Vec::new();
+        let mut result : Vec<ActiveTask> = Vec::new();
         {
             let p_tasks = self.pick_random_from_pool(r);
             for p_task in p_tasks {
@@ -142,8 +144,9 @@ impl TaskStatTrait for TaskStat {
             }
         }
         for p_task in insert_tasks {
-            self.activate_p_task(&p_task);
+            result.push(self.activate_p_task(&p_task));
         }
+        result
     }
     
     /// Generate a new task and add it to the active list
@@ -151,7 +154,7 @@ impl TaskStatTrait for TaskStat {
                            title: String,
                            description: String,
                            factor: FactorT,
-                           due_days: i16) {
+                           due_days: i16) -> ActiveTask {
         let duration = Duration::days(due_days as i64);
         let due = self.ref_tm + duration;
         let a_task = ActiveTask {
@@ -162,12 +165,13 @@ impl TaskStatTrait for TaskStat {
             },
             due: due
         };
-        self.active.insert(a_task.task.title.clone(), a_task); 
+        self.active.insert(a_task.task.title.clone(), a_task.clone());
+        a_task
     }
 
     fn add_pooled_task(&mut self, title: String, description: String,
-                           factor: FactorT, propability: FactorT,
-                           cool_down: CooldownT, due_days: DueDaysT) {
+                       factor: FactorT, propability: FactorT,
+                       cool_down: CooldownT, due_days: DueDaysT) -> PooledTask {
         let p_task = PooledTask {
             task: Task {
                 title: title,
@@ -179,7 +183,8 @@ impl TaskStatTrait for TaskStat {
             due_days: due_days,
             cooling_until: time::now()
         };
-        self.pool.insert(p_task.task.title.clone(), p_task);
+        self.pool.insert(p_task.task.title.clone(), p_task.clone());
+        p_task
     }
 
     fn mark_done(&mut self, title: String) -> bool {
@@ -220,7 +225,9 @@ mod tests {
 
     impl rand::Rng for TestRand {
         fn next_u32(&mut self) -> u32 {
-            0
+            let index = self.i % self.vals.len();
+            self.i += 1;
+            self.vals[index]
         }
 
         fn next_f32(&mut self) -> f32 {
@@ -241,6 +248,7 @@ mod tests {
         assert_eq!(0.2, rng.next_f32());
         assert_eq!(0.5, rng.next_f32());
         assert_eq!(0.0, rng.next_f32());
+        assert_eq!(1, rng.next_u32());
     }
 
     #[test]

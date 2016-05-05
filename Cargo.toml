@@ -6,3 +6,5 @@ authors = ["Simon Goller <neosam+github@posteo.de>"]
 [dependencies]
 time = "0.1"
 rand = "0.3"
+rust-crypto = "0.2.35"
+byteorder = "0.5.1"

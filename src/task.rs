@@ -198,11 +198,19 @@ impl TaskStatTrait for TaskStat {
     }
 
     fn all_actives(&self) -> Vec<ActiveTask> {
-        Vec::new()
+        let mut res: Vec<ActiveTask> = Vec::new();
+        for (_, a_task) in self.active.iter() {
+            res.push(a_task.clone());
+        }
+        res
     }
 
     fn all_pooled(&self)  -> Vec<PooledTask> {
-        Vec::new()
+        let mut res: Vec<PooledTask> = Vec::new();
+        for (_, a_task) in self.pool.iter() {
+            res.push(a_task.clone());
+        }
+        res
     }
 }
 

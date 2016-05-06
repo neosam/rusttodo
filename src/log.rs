@@ -89,6 +89,15 @@ pub fn tm_to_bytes(tm: &Tm) -> [u8; 8] {
     return res;
 }
 
+impl<T: Hashable> Log<T> {
+    /// Create a new and empty log
+    pub fn new() -> Self {
+        Log {
+            head: ParentEntry::Init
+        }
+    }
+}
+
 impl<T: Hashable> LogEntry<T> {
     pub fn entry_hash(&self) -> Hash {
         let mut msg_vec: Vec<u8> = Vec::new();
@@ -113,6 +122,7 @@ impl<T: Hashable> LogEntry<T> {
         let hash = Hash::Sha3(hash_val);
         hash
     }
+
 }
 
 impl<T: Hashable> LogTrait<T> for Log<T> {
@@ -130,7 +140,7 @@ impl<T: Hashable> LogTrait<T> for Log<T> {
         new_log_entry.hash = new_log_entry.entry_hash();
         self.head = ParentEntry::ParentEntry(new_log_entry);
     }
-    
+
     fn verify(&self) -> bool {
         let mut parent = &self.head;
         let mut verified = false;

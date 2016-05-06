@@ -106,6 +106,16 @@ pub struct TaskLog {
     pub task_stat: TaskStat
 }
 
+impl TaskLog {
+    /// Create a new and empty TaskLog instance.
+    pub fn new() -> TaskLog {
+        TaskLog {
+            log: Log::new(),
+            task_stat: TaskStat::empty_task_stat()
+        }
+    }
+}
+
 
 impl TaskStatTrait for TaskLog {
     fn add_active_task(&mut self, title: String, desc: String, factor: FactorT,

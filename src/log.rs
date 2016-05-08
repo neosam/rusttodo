@@ -10,6 +10,7 @@ use self::time::Tm;
 use self::byteorder::{BigEndian, ByteOrder};
 use self::crypto::digest::Digest;
 use self::crypto::sha3::Sha3;
+use std::io::Write;
 
 /// Stores one of the supported hash values.
 #[derive(Clone, Copy)]
@@ -175,5 +176,30 @@ impl<'a, T: 'a + Hashable> Iterator for LogIterator<'a, T> {
                 Some(entry)
             }
         }
+    }
+}
+
+trait Writable {
+    fn write(&self, writer: &mut Write);
+}
+
+impl Writable for Hash {
+    fn write(&self, writer: &mut Write) {
+        match self {
+            &Hash::Sha3(bytes) => {
+                let hash_type: [u8; 4] = [0, 0, 0, 0x01];
+                writer.write(&hash_type);
+                writer.write(&bytes);
+            }
+        }
+    }
+}
+
+impl<T: Hashable + Writable> Writable for LogEntry<T> {
+    fn write(&self, writer: &mut Write) {
+        let parent_hash: Hash = self.parent.parent_hash();
+        writer.write(&tm_to_bytes(&self.dttm));
+        parent_hash.write(writer);
+        self.entry.write(writer);
     }
 }

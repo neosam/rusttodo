@@ -96,6 +96,12 @@ impl<T: Hashable> Log<T> {
             head: ParentEntry::Init
         }
     }
+
+    pub fn iter(&mut self) -> LogIterator<T> {
+        LogIterator {
+            value: &self.head
+        }
+    }
 }
 
 impl<T: Hashable> LogEntry<T> {
@@ -151,5 +157,23 @@ impl<T: Hashable> LogTrait<T> for Log<T> {
             }
         }
         verified
+    }
+}
+
+pub struct LogIterator<'a, T: 'a + Hashable> {
+    value: &'a ParentEntry<T>
+}
+
+impl<'a, T: 'a + Hashable> Iterator for LogIterator<'a, T> {
+    type Item = &'a LogEntry<T>;
+
+    fn next(&mut self) -> Option<&'a LogEntry<T>> {
+        match self.value {
+            &ParentEntry::Init => None,
+            &ParentEntry::ParentEntry(ref entry) => {
+                self.value = &*entry.parent;
+                Some(entry)
+            }
+        }
     }
 }

@@ -13,6 +13,8 @@ use self::byteorder::{BigEndian, ByteOrder};
 use self::rand::Rng;
 use self::time::now;
 use std::io::Write;
+use std::fs::{File, create_dir_all};
+use std::io::Error;
 
 pub enum TaskAction {
     ScheduleTask(ActiveTask),
@@ -187,6 +189,12 @@ fn write_i16(writer: &mut Write, i: i16) {
     writer.write(&bytes);
 }
 
+fn write_u32(writer: &mut Write, u: u32) {
+    let mut bytes: [u8; 4] = [0; 4];
+    BigEndian::write_u32(&mut bytes, u);
+    writer.write(&bytes);
+}
+
 impl Writable for Task {
     fn write(&self, writer: &mut Write) {
         self.title.write(writer);
@@ -238,4 +246,26 @@ impl Writable for TaskAction {
             }
         }
     }
+}
+
+impl Writable for TaskStat {
+    fn write(&self, writer: &mut Write) {
+        write_u32(writer, self.active.len() as u32);
+        for (_, a_task) in self.active.iter() {
+            a_task.write(writer);
+        }
+        write_u32(writer, self.pool.len() as u32);
+        for (_, p_task) in self.pool.iter() {
+            p_task.write(writer);
+        }
+    }
+}
+
+pub fn write_task_log_to_fs(task_log: &TaskLog,
+                            dir: &str) -> Result <(), Error>{
+    save_to_fs(dir, &task_log.log);
+    let filename = dir.to_string() + "/state";
+    let mut f = try!(File::create(filename));
+    task_log.task_stat.write(&mut f);
+    f.flush()
 }

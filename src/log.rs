@@ -254,5 +254,14 @@ pub fn save_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
         entry.write(&mut f);
         try!(f.flush());
     }
-    Result::Ok(())
+    save_head_to_fs(dest_dir, log)
+}
+
+pub fn save_head_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
+                                               -> Result<(), Error> {
+    try!(create_dir_all(&dest_dir));
+    let filename = dest_dir.to_string() + "head";
+    let mut f = try!(File::create(filename));
+    log.head.parent_hash().write(&mut f);
+    f.flush()
 }

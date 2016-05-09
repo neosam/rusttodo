@@ -12,6 +12,7 @@ use self::crypto::digest::Digest;
 use self::byteorder::{BigEndian, ByteOrder};
 use self::rand::Rng;
 use self::time::now;
+use std::io::Write;
 
 pub enum TaskAction {
     ScheduleTask(ActiveTask),
@@ -88,7 +89,7 @@ impl<T: Hashable> Hashable for Vec<T> {
         let hash = Hash::Sha3(hash_val);
         hash
     }
-} 
+}
 
 impl Hashable for TaskAction {
     fn to_hash(&self) -> Hash {
@@ -162,5 +163,79 @@ impl TaskStatTrait for TaskLog {
 
     fn all_pooled(&self) -> Vec<PooledTask> {
         self.task_stat.all_pooled()
+    }
+}
+
+
+impl Writable for String {
+    fn write(&self, writer: &mut Write) {
+        let mut size: [u8; 4] = [0; 4];
+        BigEndian::write_u32(&mut size, self.len() as u32);
+        writer.write(self.as_bytes());
+    }
+}
+
+fn write_f32(writer: &mut Write, f: f32) {
+    let mut bytes: [u8; 4] = [0; 4];
+    BigEndian::write_f32(&mut bytes, f);
+    writer.write(&bytes);
+}
+
+fn write_i16(writer: &mut Write, i: i16) {
+    let mut bytes: [u8; 2] = [0; 2];
+    BigEndian::write_i16(&mut bytes, i);
+    writer.write(&bytes);
+}
+
+impl Writable for Task {
+    fn write(&self, writer: &mut Write) {
+        self.title.write(writer);
+        self.description.write(writer);
+        write_f32(writer, self.factor);
+    }
+}
+
+impl Writable for ActiveTask {
+    fn write(&self, writer: &mut Write) {
+        self.task.write(writer);
+        writer.write(&tm_to_bytes(&self.due));
+    }
+}
+
+impl Writable for PooledTask {
+    fn write(&self, writer: &mut Write) {
+        self.task.write(writer);
+        write_i16(writer, self.cool_down);
+        write_i16(writer, self.due_days);
+        writer.write(&tm_to_bytes(&self.cooling_until));
+    }
+}
+
+impl Writable for TaskAction {
+    fn write(&self, writer: &mut Write) {
+        match self {
+            &TaskAction::ScheduleTask(ref a_task) => {
+                let task_type: [u8; 1] = [0];
+                writer.write(&task_type);
+                a_task.write(writer);
+            },
+            &TaskAction::PoolTask(ref p_task) => {
+                let task_type: [u8; 1] = [1];
+                writer.write(&task_type);
+                p_task.write(writer);
+            },
+            &TaskAction::CompleteTask(ref a_task) => {
+                let task_type: [u8; 1] = [2];
+                writer.write(&task_type);
+                a_task.write(writer);
+            },
+            &TaskAction::ActivateTask(ref a_tasks) => {
+                let task_type: [u8; 1] = [3];
+                let mut size: [u8; 4] = [0; 4];
+                writer.write(&task_type);
+                BigEndian::write_u32(&mut size, a_tasks.len() as u32);
+                writer.write(&size);
+            }
+        }
     }
 }

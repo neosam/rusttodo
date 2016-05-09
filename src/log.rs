@@ -11,6 +11,8 @@ use self::byteorder::{BigEndian, ByteOrder};
 use self::crypto::digest::Digest;
 use self::crypto::sha3::Sha3;
 use std::io::Write;
+use std::fs::{File, create_dir_all};
+use std::io::Error;
 
 /// Stores one of the supported hash values.
 #[derive(Clone, Copy)]
@@ -98,7 +100,7 @@ impl<T: Hashable> Log<T> {
         }
     }
 
-    pub fn iter(&mut self) -> LogIterator<T> {
+    pub fn iter(&self) -> LogIterator<T> {
         LogIterator {
             value: &self.head
         }
@@ -179,7 +181,7 @@ impl<'a, T: 'a + Hashable> Iterator for LogIterator<'a, T> {
     }
 }
 
-trait Writable {
+pub trait Writable {
     fn write(&self, writer: &mut Write);
 }
 
@@ -202,4 +204,55 @@ impl<T: Hashable + Writable> Writable for LogEntry<T> {
         parent_hash.write(writer);
         self.entry.write(writer);
     }
+}
+
+fn half_byte_to_hex(b: u8) -> char {
+    match b {
+        0x00 => '0',
+        0x01 => '1',
+        0x02 => '2',
+        0x03 => '3',
+        0x04 => '4',
+        0x05 => '5',
+        0x06 => '6',
+        0x07 => '7',
+        0x08 => '8',
+        0x09 => '9',
+        0x0A => 'A',
+        0x0B => 'B',
+        0x0C => 'C',
+        0x0D => 'D',
+        0x0E => 'E',
+        0x0F => 'F',
+        _ => '?'
+    }
+}
+
+fn byte_to_hex(b: u8) -> String {
+    let mut res = String::new();
+    res.push(half_byte_to_hex(b / 16));
+    res.push(half_byte_to_hex(b % 16));
+    res
+}
+
+fn bin_slice_to_hex(slice: &[u8]) -> String {
+    let mut res = String::new();
+    for b in slice {
+        res.push_str(&byte_to_hex(*b));
+    }
+    res
+}
+
+pub fn save_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
+                                            -> Result<(), Error>{
+    for entry in log.iter() {
+        let hex_hash = bin_slice_to_hex(&*entry.hash.get_bytes());
+        let save_dir = dest_dir.to_string() + "/" + &hex_hash[0..2] + "/";
+        let filename = save_dir.clone() + &hex_hash[2..];
+        create_dir_all(&save_dir);
+        let mut f = try!(File::create(filename));
+        entry.write(&mut f);
+        try!(f.flush());
+    }
+    Result::Ok(())
 }

@@ -266,6 +266,7 @@ impl Readable for Task {
 impl Writable for ActiveTask {
     fn write(&self, writer: &mut Write) {
         self.task.write(writer);
+        writer.write(&tm_to_bytes(&self.start));
         writer.write(&tm_to_bytes(&self.due));
     }
 }
@@ -273,9 +274,11 @@ impl Writable for ActiveTask {
 impl Readable for ActiveTask {
     fn read(reader: &mut Read) -> ActiveTask {
         let task = Task::read(reader);
+        let start = tm_from_i64(read_i64(reader));
         let due = tm_from_i64(read_i64(reader));
         ActiveTask {
-            task: task,
+            task: task, 
+            start: start,
             due: due
         }
     }
@@ -364,6 +367,7 @@ impl Readable for TaskAction {
                     description: "".to_string(),
                     factor: 0f32
                 },
+                start: tm_from_i64(0),
                 due: tm_from_i64(0)
             })
         }
@@ -398,6 +402,49 @@ impl Readable for TaskStat {
         }
         task_stat
     }
+}
+
+impl Readable for LogEntry<TaskAction> {
+    fn read(reader: &mut Read) -> LogEntry<TaskAction> {
+        let hash = Hash::read(reader);
+        let dttm = tm_from_i64(read_i64(reader));
+        let parent_hash = Hash::read(reader);
+        let log_entry = TaskAction::read(reader);
+        LogEntry {
+            hash: hash,
+            dttm: dttm,
+            entry: log_entry,
+            parent: Box::new(ParentEntry::ParentHash(parent_hash))
+        }
+    }
+}
+
+fn load_parent_entry_from_fs(save_dir: &str, hash: &Hash)
+                             -> Result<ParentEntry<TaskAction>, Error> {
+    let byte_hash = hash.get_bytes();
+    let byte_hash_left = &byte_hash[0..1];
+    let byte_hash_right = &byte_hash[1..];
+    let filename = save_dir.to_string() + "/"
+        + bin_slice_to_hex(byte_hash_left).as_str() + "/"
+        + bin_slice_to_hex(byte_hash_right).as_str();
+    let mut f = try!(File::open(filename));
+    let mut log_entry = LogEntry::read(&mut f);
+    log_entry.parent = Box::new(
+        try!(load_parent_entry_from_fs(save_dir,
+                                  &log_entry.parent.parent_hash())));
+    let parent_entry = ParentEntry::ParentEntry(log_entry);
+    Result::Ok(parent_entry)
+}
+
+fn load_log(save_dir: &str) -> Result<Log<TaskAction>, Error> {
+    let head_file_path = save_dir.to_string() + "/head";
+    let mut head_file = try!(File::open(head_file_path));
+    let mut hash = Hash::read(&mut head_file);
+    let parent_entry = try!(load_parent_entry_from_fs(save_dir, &hash));
+    let log = Log {
+        head: Box::new(parent_entry)
+    };
+    Result::Ok(log)
 }
 
 pub fn write_task_log_to_fs(task_log: &TaskLog,

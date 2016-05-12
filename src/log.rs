@@ -15,7 +15,7 @@ use std::fs::{File, create_dir_all};
 use std::io::Error;
 
 /// Stores one of the supported hash values.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum Hash {
     Sha3([u8; 32])
 }
@@ -75,7 +75,7 @@ pub struct LogEntry<T: Hashable> {
 
 /// Main log structure which points to the latest entry.
 pub struct Log<T: Hashable> {
-    pub head: ParentEntry<T>
+    pub head: Box<ParentEntry<T>>
 }
 
 /// Functions a Log must provide to count as a log.
@@ -107,7 +107,7 @@ impl<T: Hashable> Log<T> {
     /// Create a new and empty log
     pub fn new() -> Self {
         Log {
-            head: ParentEntry::Init
+            head: Box::new(ParentEntry::Init)
         }
     }
 
@@ -149,26 +149,26 @@ impl<T: Hashable> LogTrait<T> for Log<T> {
     fn add_entry(&mut self, entry: T, tm: Tm) {
         use std::mem;
 
-        let new_parent = ParentEntry::Init;
+        let new_parent = Box::new(ParentEntry::Init);
         let head = mem::replace(&mut self.head, new_parent);
         let mut new_log_entry = LogEntry {
             hash: Hash::Sha3([0; 32]),
             dttm: tm,
             entry: entry,
-            parent: Box::new(head)
+            parent: Box::new(*head)
         };
         new_log_entry.hash = new_log_entry.entry_hash();
-        self.head = ParentEntry::ParentEntry(new_log_entry);
+        self.head = Box::new(ParentEntry::ParentEntry(new_log_entry));
     }
 
     fn verify(&self) -> bool {
         let mut parent = &self.head;
         let mut verified = false;
         loop {
-            match parent {
-                &ParentEntry::Init => {verified = true; break},
-                &ParentEntry::ParentEntry(ref x) => parent = &*x.parent,
-                &ParentEntry::ParentHash(ref hash) => {verified = true; break}
+            match **parent {
+                ParentEntry::Init => {verified = true; break},
+                ParentEntry::ParentEntry(ref x) => parent = &x.parent,
+                ParentEntry::ParentHash(ref hash) => {verified = true; break}
 
             }
         }
@@ -248,6 +248,7 @@ fn read_i64(reader: &mut Read) -> i64 {
 impl<T: Hashable + Writable> Writable for LogEntry<T> {
     fn write(&self, writer: &mut Write) {
         let parent_hash: Hash = self.parent.parent_hash();
+        self.hash.write(writer);
         writer.write(&tm_to_bytes(&self.dttm));
         parent_hash.write(writer);
         self.entry.write(writer);
@@ -291,7 +292,7 @@ fn byte_to_hex(b: u8) -> String {
     res
 }
 
-fn bin_slice_to_hex(slice: &[u8]) -> String {
+pub fn bin_slice_to_hex(slice: &[u8]) -> String {
     let mut res = String::new();
     for b in slice {
         res.push_str(&byte_to_hex(*b));

@@ -23,6 +23,7 @@ pub struct Task {
 #[derive(Clone)]
 pub struct ActiveTask {
     pub task: Task,
+    pub start: time::Tm,
     pub due: time::Tm
 }
 
@@ -110,6 +111,7 @@ impl TaskStat {
         let finish_day = self.ref_tm + Duration::days(p_task.due_days as i64);
         ActiveTask {
             task: p_task.task.clone(),
+            start: self.ref_tm,
             due: finish_day
         }
     }
@@ -163,6 +165,7 @@ impl TaskStatTrait for TaskStat {
                 description: description,
                 factor: factor
             },
+            start: self.ref_tm,
             due: due
         };
         self.active.insert(a_task.task.title.clone(), a_task.clone());

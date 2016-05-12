@@ -6,11 +6,11 @@ extern crate time;
 extern crate crypto;
 extern crate byteorder;
 
-use self::time::Tm;
+use self::time::{Tm, Timespec, at};
 use self::byteorder::{BigEndian, ByteOrder};
 use self::crypto::digest::Digest;
 use self::crypto::sha3::Sha3;
-use std::io::Write;
+use std::io::{Write, Read};
 use std::fs::{File, create_dir_all};
 use std::io::Error;
 
@@ -42,7 +42,8 @@ pub trait Hashable {
 /// Refers to a precending entry or to the root.
 pub enum ParentEntry<T: Hashable> {
     Init,
-    ParentEntry(LogEntry<T>)
+    ParentEntry(LogEntry<T>),
+    ParentHash(Hash)
 }
 
 
@@ -55,6 +56,7 @@ impl<T: Hashable> ParentEntry<T> {
         match *self {
             ParentEntry::Init => Hash::Sha3([0; 32]),
             ParentEntry::ParentEntry(ref x) => x.hash,
+            ParentEntry::ParentHash(ref hash) => hash.clone()
         }
     }
 }
@@ -90,6 +92,15 @@ pub fn tm_to_bytes(tm: &Tm) -> [u8; 8] {
     let timespec = tm.to_timespec();
     BigEndian::write_i64(&mut res, timespec.sec);
     return res;
+}
+
+pub fn tm_from_i64(i: i64) -> Tm {
+    let timespec = Timespec::new(i, 0);
+    at(timespec)
+}
+
+fn load_nothing<T: Hashable>(hash: Hash) -> Option<LogEntry<T>>{
+    None
 }
 
 impl<T: Hashable> Log<T> {
@@ -156,7 +167,9 @@ impl<T: Hashable> LogTrait<T> for Log<T> {
         loop {
             match parent {
                 &ParentEntry::Init => {verified = true; break},
-                &ParentEntry::ParentEntry(ref x) => parent = &*x.parent
+                &ParentEntry::ParentEntry(ref x) => parent = &*x.parent,
+                &ParentEntry::ParentHash(ref hash) => {verified = true; break}
+
             }
         }
         verified
@@ -177,12 +190,17 @@ impl<'a, T: 'a + Hashable> Iterator for LogIterator<'a, T> {
                 self.value = &*entry.parent;
                 Some(entry)
             }
+            &ParentEntry::ParentHash(ref hash) => None
         }
     }
 }
 
 pub trait Writable {
     fn write(&self, writer: &mut Write);
+}
+
+pub trait Readable {
+    fn read(reader: &mut Read) -> Self;
 }
 
 impl Writable for Hash {
@@ -197,6 +215,36 @@ impl Writable for Hash {
     }
 }
 
+impl Readable for Hash {
+    fn read(reader: &mut Read) -> Hash {
+        let hash_type = read_u32(reader);
+        match hash_type {
+            1 => {
+                let mut bytes: [u8; 32] = [0; 32];
+                reader.read(&mut bytes);
+                Hash::Sha3(bytes)
+            }
+            _ => {
+                let mut bytes: [u8; 32] = [0; 32];
+                Hash::Sha3(bytes)
+            }
+        }
+    }
+}
+
+
+fn read_u32(reader: &mut Read) -> u32 {
+    let mut bytes: [u8; 4] = [0; 4];
+    reader.read(&mut bytes);
+    BigEndian::read_u32(&bytes)
+}
+
+fn read_i64(reader: &mut Read) -> i64 {
+    let mut bytes: [u8; 8] = [0; 8];
+    reader.read(&mut bytes);
+    BigEndian::read_i64(&bytes)
+}
+
 impl<T: Hashable + Writable> Writable for LogEntry<T> {
     fn write(&self, writer: &mut Write) {
         let parent_hash: Hash = self.parent.parent_hash();
@@ -205,6 +253,14 @@ impl<T: Hashable + Writable> Writable for LogEntry<T> {
         self.entry.write(writer);
     }
 }
+
+/*impl<T: Hashable + Readable> Readable for LogEntry<T> {
+    fn read(reader: &mut Read) -> LogEntry<T> {
+        let hash = Hash::read(reader);
+        let dttm = tm_from_i64(read_i64(reader));
+
+    }
+}*/
 
 fn half_byte_to_hex(b: u8) -> char {
     match b {

@@ -12,9 +12,10 @@ use self::crypto::digest::Digest;
 use self::byteorder::{BigEndian, ByteOrder};
 use self::rand::Rng;
 use self::time::now;
-use std::io::Write;
+use std::io::{Write, Read};
 use std::fs::{File, create_dir_all};
 use std::io::Error;
+use std::cmp::min;
 
 pub enum TaskAction {
     ScheduleTask(ActiveTask),
@@ -177,10 +178,38 @@ impl Writable for String {
     }
 }
 
+impl Readable for String {
+    fn read(reader: &mut Read) -> String {
+        let size = read_u32(reader);
+        let mut str_bytes = read_bytes(reader, size as usize);
+        String::from_utf8(str_bytes).unwrap()
+    }
+}
+
+fn read_bytes(reader: &mut Read, n: usize) -> Vec<u8> {
+    let mut read_bytes: usize = 0;
+    let mut buffer: [u8; 1024] = [0; 1024];
+    let mut res: Vec<u8> = Vec::with_capacity(n);
+    while read_bytes < n {
+        let bytes_to_read = min(1024, n - read_bytes);
+        reader.read(&mut buffer);
+        for i in 0..read_bytes {
+            res.push(buffer[i]);
+        }
+    }
+    res
+}
+
 fn write_f32(writer: &mut Write, f: f32) {
     let mut bytes: [u8; 4] = [0; 4];
     BigEndian::write_f32(&mut bytes, f);
     writer.write(&bytes);
+}
+
+fn read_f32(reader: &mut Read) -> f32 {
+    let mut bytes: [u8; 4] = [0; 4];
+    reader.read(&mut bytes);
+    BigEndian::read_f32(&mut bytes)
 }
 
 fn write_i16(writer: &mut Write, i: i16) {
@@ -189,10 +218,28 @@ fn write_i16(writer: &mut Write, i: i16) {
     writer.write(&bytes);
 }
 
+fn read_i16(reader: &mut Read) -> i16 {
+    let mut bytes: [u8; 2] = [0; 2];
+    reader.read(&mut bytes);
+    BigEndian::read_i16(&bytes)
+}
+
 fn write_u32(writer: &mut Write, u: u32) {
     let mut bytes: [u8; 4] = [0; 4];
     BigEndian::write_u32(&mut bytes, u);
     writer.write(&bytes);
+}
+
+fn read_u32(reader: &mut Read) -> u32 {
+    let mut bytes: [u8; 4] = [0; 4];
+    reader.read(&mut bytes);
+    BigEndian::read_u32(&mut bytes)
+}
+
+fn read_i64(reader: &mut Read) -> i64 {
+    let mut bytes: [u8; 8] = [0; 8];
+    reader.read(&mut bytes);
+    BigEndian::read_i64(&bytes)
 }
 
 impl Writable for Task {
@@ -203,6 +250,19 @@ impl Writable for Task {
     }
 }
 
+impl Readable for Task {
+    fn read(reader: &mut Read) -> Task {
+        let title = String::read(reader);
+        let desc = String::read(reader);
+        let factor = read_f32(reader);
+        Task {
+            title: title,
+            description: desc,
+            factor: factor
+        }
+    }
+}
+
 impl Writable for ActiveTask {
     fn write(&self, writer: &mut Write) {
         self.task.write(writer);
@@ -210,12 +270,41 @@ impl Writable for ActiveTask {
     }
 }
 
+impl Readable for ActiveTask {
+    fn read(reader: &mut Read) -> ActiveTask {
+        let task = Task::read(reader);
+        let due = tm_from_i64(read_i64(reader));
+        ActiveTask {
+            task: task,
+            due: due
+        }
+    }
+}
+
 impl Writable for PooledTask {
     fn write(&self, writer: &mut Write) {
         self.task.write(writer);
+        write_f32(writer, self.propability);
         write_i16(writer, self.cool_down);
         write_i16(writer, self.due_days);
         writer.write(&tm_to_bytes(&self.cooling_until));
+    }
+}
+
+impl Readable for PooledTask {
+    fn read(reader: &mut Read) -> PooledTask {
+        let task = Task::read(reader);
+        let propability = read_f32(reader);
+        let cool_down = read_i16(reader);
+        let due_days = read_i16(reader);
+        let cooling_until = tm_from_i64(read_i64(reader));
+        PooledTask {
+            task: task,
+            propability: propability,
+            cool_down: cool_down,
+            due_days: due_days,
+            cooling_until: cooling_until
+        }
     }
 }
 
@@ -243,7 +332,40 @@ impl Writable for TaskAction {
                 writer.write(&task_type);
                 BigEndian::write_u32(&mut size, a_tasks.len() as u32);
                 writer.write(&size);
+                for a_task in a_tasks {
+                    a_task.write(writer);
+                }
             }
+        }
+    }
+}
+
+impl Readable for TaskAction {
+    fn read(reader: &mut Read) -> TaskAction {
+        let mut task_type: [u8; 1] = [0; 1];
+        reader.read(&mut task_type);
+        match task_type[0] {
+            1 => TaskAction::ScheduleTask(ActiveTask::read(reader)),
+            2 => TaskAction::PoolTask(PooledTask::read(reader)),
+            3 => TaskAction::CompleteTask(ActiveTask::read(reader)),
+            4 => {
+                let length = read_u32(reader);
+                let mut a_tasks: Vec<ActiveTask> = Vec::new();
+                for i in 0..length {
+                    let a_task = ActiveTask::read(reader);
+                    a_tasks.push(a_task);
+                }
+                TaskAction::ActivateTask(a_tasks)
+            },
+            // I really have to add error handling
+            _ => TaskAction::ScheduleTask(ActiveTask{
+                task: Task {
+                    title: "".to_string(),
+                    description: "".to_string(),
+                    factor: 0f32
+                },
+                due: tm_from_i64(0)
+            })
         }
     }
 }
@@ -258,6 +380,23 @@ impl Writable for TaskStat {
         for (_, p_task) in self.pool.iter() {
             p_task.write(writer);
         }
+    }
+}
+
+impl Readable for TaskStat {
+    fn read(reader: &mut Read) -> TaskStat {
+        let mut task_stat = TaskStat::empty_task_stat();
+        let a_task_length = read_u32(reader);
+        for _ in 0..a_task_length {
+            let a_task = ActiveTask::read(reader);
+            task_stat.active.insert(a_task.task.title.clone(), a_task.clone());
+        }
+        let p_task_length = read_u32(reader);
+        for _ in 0..p_task_length {
+            let p_task = PooledTask::read(reader);
+            task_stat.pool.insert(p_task.task.title.clone(), p_task.clone());
+        }
+        task_stat
     }
 }
 

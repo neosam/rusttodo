@@ -455,3 +455,11 @@ pub fn write_task_log_to_fs(task_log: &TaskLog,
     task_log.task_stat.write(&mut f);
     f.flush()
 }
+
+pub fn read_task_log_to_fs(task_log: &mut TaskLog, dir: &str) {
+    let log = load_log((dir.to_string() + "/head").as_str()).unwrap();
+    let mut state_file = File::open(dir.to_string() + "/head").unwrap();
+    let task_stat = TaskStat::read(&mut state_file);
+    task_log.log = log;
+    task_log.task_stat = task_stat;
+}

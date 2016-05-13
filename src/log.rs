@@ -15,9 +15,25 @@ use std::fs::{File, create_dir_all};
 use std::io::Error;
 
 /// Stores one of the supported hash values.
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy)]
 pub enum Hash {
     Sha3([u8; 32])
+}
+
+impl PartialEq for Hash {
+    fn eq(&self, other: &Hash) -> bool {
+        match self {
+            &Hash::Sha3(ref arr) => {
+                let &Hash::Sha3(ref o_arr) = other;
+                for i in 0..32 {
+                    if arr[i] != o_arr[i] {
+                        return false
+                    }
+                }
+                true
+            }
+        }
+    }
 }
 
 
@@ -90,6 +106,7 @@ pub trait LogTrait<T: Hashable> {
 pub fn tm_to_bytes(tm: &Tm) -> [u8; 8] {
     let mut res : [u8; 8] = [0; 8];
     let timespec = tm.to_timespec();
+    println!("Sec: {}", timespec.sec);
     BigEndian::write_i64(&mut res, timespec.sec);
     return res;
 }
@@ -306,10 +323,11 @@ pub fn save_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
         let hex_hash = bin_slice_to_hex(&*entry.hash.get_bytes());
         let save_dir = dest_dir.to_string() + "/" + &hex_hash[0..2] + "/";
         let filename = save_dir.clone() + &hex_hash[2..];
+        println!("Hex hash:  {}", hex_hash);
         create_dir_all(&save_dir);
         let mut f = try!(File::create(filename));
         entry.write(&mut f);
-        try!(f.flush());
+        f.flush().expect("Could not flush file");
     }
     save_head_to_fs(dest_dir, log)
 }

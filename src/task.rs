@@ -150,7 +150,7 @@ impl TaskStatTrait for TaskStat {
         }
         result
     }
-    
+
     /// Generate a new task and add it to the active list
     fn add_active_task(&mut self,
                            title: String,

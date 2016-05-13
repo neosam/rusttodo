@@ -174,6 +174,7 @@ impl Writable for String {
     fn write(&self, writer: &mut Write) {
         let mut size: [u8; 4] = [0; 4];
         BigEndian::write_u32(&mut size, self.len() as u32);
+        writer.write(&size);
         writer.write(self.as_bytes());
     }
 }
@@ -182,20 +183,19 @@ impl Readable for String {
     fn read(reader: &mut Read) -> String {
         let size = read_u32(reader);
         let mut str_bytes = read_bytes(reader, size as usize);
-        String::from_utf8(str_bytes).unwrap()
+        let string = String::from_utf8(str_bytes).unwrap();
+        println!("String read: {}", string);
+        string
     }
 }
 
 fn read_bytes(reader: &mut Read, n: usize) -> Vec<u8> {
     let mut read_bytes: usize = 0;
-    let mut buffer: [u8; 1024] = [0; 1024];
+    let mut buffer: [u8; 1] = [0; 1];
     let mut res: Vec<u8> = Vec::with_capacity(n);
-    while read_bytes < n {
-        let bytes_to_read = min(1024, n - read_bytes);
+    for _ in 0..n {
         reader.read(&mut buffer);
-        for i in 0..read_bytes {
-            res.push(buffer[i]);
-        }
+        res.push(buffer[0]);
     }
     res
 }
@@ -239,7 +239,9 @@ fn read_u32(reader: &mut Read) -> u32 {
 fn read_i64(reader: &mut Read) -> i64 {
     let mut bytes: [u8; 8] = [0; 8];
     reader.read(&mut bytes);
-    BigEndian::read_i64(&bytes)
+    let val = BigEndian::read_i64(&bytes);
+    println!("read i64: {}", val);
+    val
 }
 
 impl Writable for Task {
@@ -266,16 +268,26 @@ impl Readable for Task {
 impl Writable for ActiveTask {
     fn write(&self, writer: &mut Write) {
         self.task.write(writer);
-        writer.write(&tm_to_bytes(&self.start));
-        writer.write(&tm_to_bytes(&self.due));
+        let start: [u8; 8]= tm_to_bytes(&self.start);
+        let due: [u8; 8] = tm_to_bytes(&self.due);
+        let start_str = bin_slice_to_hex(&start);
+        let due_str = bin_slice_to_hex(&due);
+        println!("Start: {}\nDue: {}", start_str, due_str);
+        writer.write(&start);
+        writer.flush();
+        writer.write(&due);
+        writer.flush();
     }
 }
 
 impl Readable for ActiveTask {
     fn read(reader: &mut Read) -> ActiveTask {
         let task = Task::read(reader);
+        println!("a_task 1");
         let start = tm_from_i64(read_i64(reader));
+        println!("a_task 2");
         let due = tm_from_i64(read_i64(reader));
+        println!("a_task 3");
         ActiveTask {
             task: task, 
             start: start,
@@ -348,10 +360,10 @@ impl Readable for TaskAction {
         let mut task_type: [u8; 1] = [0; 1];
         reader.read(&mut task_type);
         match task_type[0] {
-            1 => TaskAction::ScheduleTask(ActiveTask::read(reader)),
-            2 => TaskAction::PoolTask(PooledTask::read(reader)),
-            3 => TaskAction::CompleteTask(ActiveTask::read(reader)),
-            4 => {
+            0 => TaskAction::ScheduleTask(ActiveTask::read(reader)),
+            1 => TaskAction::PoolTask(PooledTask::read(reader)),
+            2 => TaskAction::CompleteTask(ActiveTask::read(reader)),
+            3 => {
                 let length = read_u32(reader);
                 let mut a_tasks: Vec<ActiveTask> = Vec::new();
                 for i in 0..length {
@@ -421,25 +433,33 @@ impl Readable for LogEntry<TaskAction> {
 
 fn load_parent_entry_from_fs(save_dir: &str, hash: &Hash)
                              -> Result<ParentEntry<TaskAction>, Error> {
+    let null_hash = Hash::Sha3([0u8; 32]);
     let byte_hash = hash.get_bytes();
     let byte_hash_left = &byte_hash[0..1];
     let byte_hash_right = &byte_hash[1..];
     let filename = save_dir.to_string() + "/"
         + bin_slice_to_hex(byte_hash_left).as_str() + "/"
         + bin_slice_to_hex(byte_hash_right).as_str();
+    println!("Load entry:  {}", filename);
     let mut f = try!(File::open(filename));
-    let mut log_entry = LogEntry::read(&mut f);
-    log_entry.parent = Box::new(
-        try!(load_parent_entry_from_fs(save_dir,
-                                  &log_entry.parent.parent_hash())));
+    let mut log_entry: LogEntry<TaskAction> = LogEntry::read(&mut f);
+    if log_entry.parent.parent_hash() != null_hash {
+        log_entry.parent = Box::new(
+            try!(load_parent_entry_from_fs(save_dir,
+                                           &log_entry.parent.parent_hash())));
+    } else {
+        log_entry.parent = Box::new(ParentEntry::Init);
+    }
     let parent_entry = ParentEntry::ParentEntry(log_entry);
     Result::Ok(parent_entry)
 }
 
 fn load_log(save_dir: &str) -> Result<Log<TaskAction>, Error> {
     let head_file_path = save_dir.to_string() + "/head";
+    println!("{}", head_file_path);
     let mut head_file = try!(File::open(head_file_path));
     let mut hash = Hash::read(&mut head_file);
+    println!("test2");
     let parent_entry = try!(load_parent_entry_from_fs(save_dir, &hash));
     let log = Log {
         head: Box::new(parent_entry)
@@ -457,8 +477,8 @@ pub fn write_task_log_to_fs(task_log: &TaskLog,
 }
 
 pub fn read_task_log_to_fs(task_log: &mut TaskLog, dir: &str) {
-    let log = load_log((dir.to_string() + "/head").as_str()).unwrap();
-    let mut state_file = File::open(dir.to_string() + "/head").unwrap();
+    let log = load_log(dir).unwrap();
+    let mut state_file = File::open(dir.to_string() + "/state").unwrap();
     let task_stat = TaskStat::read(&mut state_file);
     task_log.log = log;
     task_log.task_stat = task_stat;

@@ -326,10 +326,18 @@ pub fn save_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
         println!("Hex hash:  {}", hex_hash);
         create_dir_all(&save_dir);
         let mut f = try!(File::create(filename));
+        f.write("TBDE".as_bytes());
+        write_u32(&mut f, 1);
         entry.write(&mut f);
         f.flush().expect("Could not flush file");
     }
     save_head_to_fs(dest_dir, log)
+}
+
+fn write_u32(writer: &mut Write, u: u32) {
+    let mut bytes: [u8; 4] = [0; 4];
+    BigEndian::write_u32(&mut bytes, u);
+    writer.write(&bytes);
 }
 
 pub fn save_head_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
@@ -337,6 +345,8 @@ pub fn save_head_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
     try!(create_dir_all(&dest_dir));
     let filename = dest_dir.to_string() + "head";
     let mut f = try!(File::create(filename));
+    f.write("TBDH".as_bytes());
+    write_u32(&mut f, 1);
     log.head.parent_hash().write(&mut f);
     f.flush()
 }

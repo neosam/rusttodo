@@ -442,6 +442,9 @@ fn load_parent_entry_from_fs(save_dir: &str, hash: &Hash)
         + bin_slice_to_hex(byte_hash_right).as_str();
     println!("Load entry:  {}", filename);
     let mut f = try!(File::open(filename));
+    let mut magic_num = [0u8; 4];
+    f.read(&mut magic_num);
+    let version = read_u32(&mut f);
     let mut log_entry: LogEntry<TaskAction> = LogEntry::read(&mut f);
     if log_entry.parent.parent_hash() != null_hash {
         log_entry.parent = Box::new(
@@ -458,6 +461,9 @@ fn load_log(save_dir: &str) -> Result<Log<TaskAction>, Error> {
     let head_file_path = save_dir.to_string() + "/head";
     println!("{}", head_file_path);
     let mut head_file = try!(File::open(head_file_path));
+    let mut magic_num = [0u8; 4];
+    head_file.read(&mut magic_num);
+    let version = read_u32(&mut head_file);
     let mut hash = Hash::read(&mut head_file);
     println!("test2");
     let parent_entry = try!(load_parent_entry_from_fs(save_dir, &hash));
@@ -472,6 +478,8 @@ pub fn write_task_log_to_fs(task_log: &TaskLog,
     save_to_fs(dir, &task_log.log);
     let filename = dir.to_string() + "/state";
     let mut f = try!(File::create(filename));
+    f.write("TBDS".as_bytes());
+    write_u32(&mut f, 1);
     task_log.task_stat.write(&mut f);
     f.flush()
 }
@@ -479,6 +487,9 @@ pub fn write_task_log_to_fs(task_log: &TaskLog,
 pub fn read_task_log_to_fs(task_log: &mut TaskLog, dir: &str) {
     let log = load_log(dir).unwrap();
     let mut state_file = File::open(dir.to_string() + "/state").unwrap();
+    let mut magic_num = [0u8; 4];
+    state_file.read(&mut magic_num);
+    let version = read_u32(&mut state_file);
     let task_stat = TaskStat::read(&mut state_file);
     task_log.log = log;
     task_log.task_stat = task_stat;

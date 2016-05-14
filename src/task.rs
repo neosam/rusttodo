@@ -70,6 +70,21 @@ pub trait TaskStatTrait {
     fn all_pooled(&self) -> Vec<PooledTask>;
 }
 
+/// Floor to the day if tm and remove time zone information
+///
+/// This is because tasks are based on days by default
+fn floor_tm_day(tm: &mut time::Tm) {
+    // Remove hours and everything below
+    tm.tm_hour = 0;
+    tm.tm_min = 0;
+    tm.tm_sec = 0;
+    tm.tm_nsec = 0;
+
+    // Remove daylight saving time and time zone information
+    tm.tm_isdst = -1;
+    tm.tm_utcoff = 0;
+}
+
 /// Task stat implementation
 impl TaskStat {
     /// Generate a new and empty task stat
@@ -108,7 +123,8 @@ impl TaskStat {
     }
 
     fn p_to_a_task(&self, p_task: &PooledTask) -> ActiveTask {
-        let finish_day = self.ref_tm + Duration::days(p_task.due_days as i64);
+        let mut finish_day = self.ref_tm + Duration::days(p_task.due_days as i64);
+        floor_tm_day(&mut finish_day);
         ActiveTask {
             task: p_task.task.clone(),
             start: self.ref_tm,
@@ -157,6 +173,7 @@ impl TaskStatTrait for TaskStat {
                            description: String,
                            factor: FactorT,
                            due_days: i16) -> ActiveTask {
+        floor_tm_day(&mut self.ref_tm);
         let duration = Duration::days(due_days as i64);
         let due = self.ref_tm + duration;
         let a_task = ActiveTask {
@@ -175,6 +192,7 @@ impl TaskStatTrait for TaskStat {
     fn add_pooled_task(&mut self, title: String, description: String,
                        factor: FactorT, propability: FactorT,
                        cool_down: CooldownT, due_days: DueDaysT) -> PooledTask {
+        floor_tm_day(&mut self.ref_tm);
         let p_task = PooledTask {
             task: Task {
                 title: title,
@@ -184,7 +202,7 @@ impl TaskStatTrait for TaskStat {
             propability: propability,
             cool_down: cool_down,
             due_days: due_days,
-            cooling_until: time::now()
+            cooling_until: self.ref_tm
         };
         self.pool.insert(p_task.task.title.clone(), p_task.clone());
         p_task
@@ -225,7 +243,6 @@ mod tests {
     use super::*;
     use super::rand;
     use super::rand::Rng;
-    use super::TaskStatTrait;
     use std::collections::BTreeMap;
 
     struct TestRand {

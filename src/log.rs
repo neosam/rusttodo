@@ -6,7 +6,7 @@ extern crate time;
 extern crate crypto;
 extern crate byteorder;
 
-use self::time::{Tm, Timespec, at};
+use self::time::{Tm, Timespec, at_utc};
 use self::byteorder::{BigEndian, ByteOrder};
 use self::crypto::digest::Digest;
 use self::crypto::sha3::Sha3;
@@ -113,7 +113,7 @@ pub fn tm_to_bytes(tm: &Tm) -> [u8; 8] {
 
 pub fn tm_from_i64(i: i64) -> Tm {
     let timespec = Timespec::new(i, 0);
-    at(timespec)
+    at_utc(timespec)
 }
 
 fn load_nothing<T: Hashable>(hash: Hash) -> Option<LogEntry<T>>{
@@ -323,7 +323,6 @@ pub fn save_to_fs<T: Hashable + Writable>(dest_dir: &str, log: &Log<T>)
         let hex_hash = bin_slice_to_hex(&*entry.hash.get_bytes());
         let save_dir = dest_dir.to_string() + "/" + &hex_hash[0..2] + "/";
         let filename = save_dir.clone() + &hex_hash[2..];
-        println!("Hex hash:  {}", hex_hash);
         create_dir_all(&save_dir);
         let mut f = try!(File::create(filename));
         f.write("TBDE".as_bytes());

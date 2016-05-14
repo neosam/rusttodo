@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["ActiveTask","A task which got activated."],["PooledTask","A task which is about to get activated"],["Task","Base task type"],["TaskStat","Overall state of the tasks"]],"trait":[["TaskStatTrait",""]],"type":[["CooldownT",""],["DueDaysT",""],["FactorT",""]]});

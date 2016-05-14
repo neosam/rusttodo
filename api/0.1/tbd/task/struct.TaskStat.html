@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `TaskStat` struct in crate `tbd`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, TaskStat">
+
+    <title>tbd::task::TaskStat - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='../index.html'>tbd</a>::<wbr><a href='index.html'>task</a></p><script>window.sidebarCurrent = {name: 'TaskStat', ty: 'struct', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content struct">
+<h1 class='fqn'><span class='in-band'>Struct <a href='../index.html'>tbd</a>::<wbr><a href='index.html'>task</a>::<wbr><a class='struct' href=''>TaskStat</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-47' class='srclink' href='../../src/tbd/src/task.rs.html#41-45' title='goto source code'>[src]</a></span></h1>
+<pre class='rust struct'>pub struct TaskStat {
+    pub active: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/btree/map/struct.BTreeMap.html' title='collections::btree::map::BTreeMap'>BTreeMap</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='struct' href='../../tbd/task/struct.ActiveTask.html' title='tbd::task::ActiveTask'>ActiveTask</a>&gt;,
+    pub pool: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/btree/map/struct.BTreeMap.html' title='collections::btree::map::BTreeMap'>BTreeMap</a>&lt;<a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, <a class='struct' href='../../tbd/task/struct.PooledTask.html' title='tbd::task::PooledTask'>PooledTask</a>&gt;,
+    pub ref_tm: <a class='struct' href='../../time/struct.Tm.html' title='time::Tm'>Tm</a>,
+}</pre><div class='docblock'><p>Overall state of the tasks</p>
+</div><h2 class='fields'>Fields</h2>
+<table><tr class='stab '>
+                                  <td id='structfield.active'><code>active</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.pool'><code>pool</code></td><td></td></tr><tr class='stab '>
+                                  <td id='structfield.ref_tm'><code>ref_tm</code></td><td></td></tr></table><h2 id='methods'>Methods</h2><h3 class='impl'><code>impl <a class='struct' href='../../tbd/task/struct.TaskStat.html' title='tbd::task::TaskStat'>TaskStat</a></code></h3><div class='docblock'><p>Task stat implementation</p>
+</div><div class='impl-items'><h4 id='method.empty_task_stat' class='method'><code>fn <a href='#method.empty_task_stat' class='fnname'>empty_task_stat</a>() -&gt; <a class='struct' href='../../tbd/task/struct.TaskStat.html' title='tbd::task::TaskStat'>TaskStat</a></code></h4>
+<div class='docblock'><p>Generate a new and empty task stat</p>
+</div></div><h2 id='implementations'>Trait Implementations</h2><h3 class='impl'><code>impl <a class='trait' href='../../tbd/task/trait.TaskStatTrait.html' title='tbd::task::TaskStatTrait'>TaskStatTrait</a> for <a class='struct' href='../../tbd/task/struct.TaskStat.html' title='tbd::task::TaskStat'>TaskStat</a></code></h3><div class='impl-items'><h4 id='method.activate' class='method'><code>fn <a href='../../tbd/task/trait.TaskStatTrait.html#method.activate' class='fnname'>activate</a>&lt;R: <a class='trait' href='../../rand/trait.Rng.html' title='rand::Rng'>Rng</a>&gt;(&amp;mut self, r: &amp;mut R) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../../tbd/task/struct.ActiveTask.html' title='tbd::task::ActiveTask'>ActiveTask</a>&gt;</code></h4>
+<h4 id='method.add_active_task' class='method'><code>fn <a href='../../tbd/task/trait.TaskStatTrait.html#method.add_active_task' class='fnname'>add_active_task</a>(&amp;mut self, title: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, description: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, factor: <a class='type' href='../../tbd/task/type.FactorT.html' title='tbd::task::FactorT'>FactorT</a>, due_days: <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.i16.html'>i16</a>) -&gt; <a class='struct' href='../../tbd/task/struct.ActiveTask.html' title='tbd::task::ActiveTask'>ActiveTask</a></code></h4>
+<h4 id='method.add_pooled_task' class='method'><code>fn <a href='../../tbd/task/trait.TaskStatTrait.html#method.add_pooled_task' class='fnname'>add_pooled_task</a>(&amp;mut self, title: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, description: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>, factor: <a class='type' href='../../tbd/task/type.FactorT.html' title='tbd::task::FactorT'>FactorT</a>, propability: <a class='type' href='../../tbd/task/type.FactorT.html' title='tbd::task::FactorT'>FactorT</a>, cool_down: <a class='type' href='../../tbd/task/type.CooldownT.html' title='tbd::task::CooldownT'>CooldownT</a>, due_days: <a class='type' href='../../tbd/task/type.DueDaysT.html' title='tbd::task::DueDaysT'>DueDaysT</a>) -&gt; <a class='struct' href='../../tbd/task/struct.PooledTask.html' title='tbd::task::PooledTask'>PooledTask</a></code></h4>
+<h4 id='method.mark_done' class='method'><code>fn <a href='../../tbd/task/trait.TaskStatTrait.html#method.mark_done' class='fnname'>mark_done</a>(&amp;mut self, title: <a class='struct' href='https://doc.rust-lang.org/nightly/collections/string/struct.String.html' title='collections::string::String'>String</a>) -&gt; <a class='primitive' href='https://doc.rust-lang.org/nightly/std/primitive.bool.html'>bool</a></code></h4>
+<h4 id='method.all_actives' class='method'><code>fn <a href='../../tbd/task/trait.TaskStatTrait.html#method.all_actives' class='fnname'>all_actives</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../../tbd/task/struct.ActiveTask.html' title='tbd::task::ActiveTask'>ActiveTask</a>&gt;</code></h4>
+<h4 id='method.all_pooled' class='method'><code>fn <a href='../../tbd/task/trait.TaskStatTrait.html#method.all_pooled' class='fnname'>all_pooled</a>(&amp;self) -&gt; <a class='struct' href='https://doc.rust-lang.org/nightly/collections/vec/struct.Vec.html' title='collections::vec::Vec'>Vec</a>&lt;<a class='struct' href='../../tbd/task/struct.PooledTask.html' title='tbd::task::PooledTask'>PooledTask</a>&gt;</code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='../../tbd/log/trait.Writable.html' title='tbd::log::Writable'>Writable</a> for <a class='struct' href='../../tbd/task/struct.TaskStat.html' title='tbd::task::TaskStat'>TaskStat</a></code></h3><div class='impl-items'><h4 id='method.write' class='method'><code>fn <a href='../../tbd/log/trait.Writable.html#method.write' class='fnname'>write</a>(&amp;self, writer: &amp;mut <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Write.html' title='std::io::Write'>Write</a>)</code></h4>
+</div><h3 class='impl'><code>impl <a class='trait' href='../../tbd/log/trait.Readable.html' title='tbd::log::Readable'>Readable</a> for <a class='struct' href='../../tbd/task/struct.TaskStat.html' title='tbd::task::TaskStat'>TaskStat</a></code></h3><div class='impl-items'><h4 id='method.read' class='method'><code>fn <a href='../../tbd/log/trait.Readable.html#method.read' class='fnname'>read</a>(reader: &amp;mut <a class='trait' href='https://doc.rust-lang.org/nightly/std/io/trait.Read.html' title='std::io::Read'>Read</a>) -&gt; <a class='struct' href='../../tbd/task/struct.TaskStat.html' title='tbd::task::TaskStat'>TaskStat</a></code></h4>
+</div></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "tbd";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

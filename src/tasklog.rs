@@ -147,15 +147,14 @@ impl TaskStatTrait for TaskLog {
     }
 
     fn mark_done(&mut self, title: String) -> bool {
-        let mut success = self.task_stat.mark_done(title.clone());
-        if success {
-            if let Some(a_task) = self.task_stat.active.get(&title) {
-                self.log.add_entry(TaskAction::CompleteTask(a_task.clone()), now());
-            } else {
-                success = false;
-            }
+        let mut success = true;
+        if let Some(a_task) = self.task_stat.active.get(&title) {
+            self.log.add_entry(TaskAction::CompleteTask(a_task.clone()), now());
         } else {
             success = false;
+        }
+        if success {
+            success = self.task_stat.mark_done(title.clone());
         }
         success
     }

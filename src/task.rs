@@ -115,11 +115,19 @@ impl TaskStat {
     fn is_p_task_cooling_down(&self, p_task: &PooledTask) -> bool {
         let now = self.ref_tm;
         let task_limit = p_task.cooling_until;
-        now > task_limit
+        now < task_limit
     }
 
     fn can_activate(&self, p_task: &PooledTask) -> bool {
-        !self.is_p_task_active(p_task) && !self.is_p_task_cooling_down(p_task)
+        let is_active = self.is_p_task_active(p_task);
+        let is_cooldown = self.is_p_task_cooling_down(p_task);
+        if is_active {
+            println!("{} is already active", p_task.title_string());
+        }
+        if is_cooldown {
+            println!("{} is cooling down", p_task.title_string());
+        }
+        return !(is_active || is_cooldown)
     }
 
     fn p_to_a_task(&self, p_task: &PooledTask) -> ActiveTask {

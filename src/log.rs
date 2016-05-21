@@ -19,12 +19,15 @@
 //! use tbd::log::*;
 //! use std::io::Write;
 //!
-//! // Defining the type we want to store.
+//! // Defining the type we want to store.  Lets use a simple struct which
+//! // stores a byte for this example.
 //! struct MyStruct {
 //!    x: u8
 //! }
 //!
-//! // Implement the Writable trait
+//! // Implement the Writable trait.  We need it for two reasons:
+//! // 1. For serialization to save it.
+//! // 2. To generate a hash value.
 //! impl Writable for MyStruct {
 //!    fn write_to(&self, write: &mut Write) {
 //!       let byte = [self.x];
@@ -32,15 +35,17 @@
 //!    }
 //! }
 //!
-//! // Use the helper function writeable_to_hash to implment as_hash()
+//! // Make our type Hashable so we can store it in the Log.
+//! // Use the helper function writeable_to_hash to implement as_hash()
 //! impl Hashable for MyStruct {
 //!    fn as_hash(&self) -> Hash {
 //!       self.writeable_to_hash()
 //!    }
 //! }
 //!
-//! // Create new log
-//! let mut log = DefaultLog::<MyStruct>::new();
+//! // Create new log object.  DefaultLog is the standard implementation
+//! // which also provides support to store and load entries and for iterators.
+//! let mut log: DefaultLog<MyStruct> = DefaultLog::new();
 //!
 //! // Add some entries
 //! let first_hash: Hash = log.push(MyStruct{x: 42});
@@ -53,12 +58,13 @@
 //!                &second_hash.as_string());
 //!
 //! // Inserting the same value again gives a completely different hash because
-//! // the hash also contains the privious entry.
+//! // the hash also contains the previous entry.
 //! let third_hash: Hash = log.push(MyStruct{x: 23});
 //! assert_eq!("f87fa51292d72bb55a842b3f46c83adf71720a89abc3c7d89494d84458b57861",
 //!                &third_hash.as_string());
 //!
-//! // Verify entries
+//! // With get, we can borrow the entries using the hashes received from the
+//! // push method.
 //! assert_eq!(42, log.get(first_hash).unwrap().x);
 //! assert_eq!(23, log.get(second_hash).unwrap().x);
 //! assert_eq!(23, log.get(third_hash).unwrap().x);
@@ -74,6 +80,17 @@
 //! assert_eq!(23, res[0]);
 //! assert_eq!(23, res[1]);
 //! assert_eq!(42, res[2]);
+//!
+//! // We can also iterate over the hashes.  Lets collect all in a Vec.
+//! let mut hashes: Vec<Hash> = log.hash_iter().collect();
+//! assert_eq!(3, hashes.len());
+//! assert_eq!("f87fa51292d72bb55a842b3f46c83adf71720a89abc3c7d89494d84458b57861",
+//!                &hashes[0].as_string());
+//! assert_eq!("5894a38091d60a64cb6396edc2662c6460c3685b78b4381051dbc15ff30c5bcc",
+//!                &hashes[1].as_string());
+//! assert_eq!("377194384a7432ebd8d8e0f19a1bcc17f115a220d48e280f8d75b6a5b43c3e1d",
+//!                &hashes[2].as_string());
+//! 
 //! ```
 
 
@@ -89,7 +106,7 @@ use std::collections::BTreeMap;
 
 // ---- Core types ----
 
-/// Contains a ordered set of entries and use a way to verify them.
+/// Contains a ordered set of entries by using crypto hash to chain them.
 pub trait Log {
     type Item: Hashable;
 
@@ -165,9 +182,9 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorHash<'a, L, T
         match self.hash {
             None => None,
             Some(hash) => {
-                let value = self.log.get(hash);
+                let value = self.hash;
                 self.hash = self.log.parent_hash(hash);
-                self.hash
+                value
             }
         }
     } 

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="rustdoc">
+    <meta name="description" content="API documentation for the Rust `Log` trait in crate `tbd`.">
+    <meta name="keywords" content="rust, rustlang, rust-lang, Log">
+
+    <title>tbd::log::Log - Rust</title>
+
+    <link rel="stylesheet" type="text/css" href="../../rustdoc.css">
+    <link rel="stylesheet" type="text/css" href="../../main.css">
+
+    
+    
+</head>
+<body class="rustdoc">
+    <!--[if lte IE 8]>
+    <div class="warning">
+        This old browser is unsupported and will most likely display funky
+        things.
+    </div>
+    <![endif]-->
+
+    
+
+    <nav class="sidebar">
+        
+        <p class='location'><a href='../index.html'>tbd</a>::<wbr><a href='index.html'>log</a></p><script>window.sidebarCurrent = {name: 'Log', ty: 'trait', relpath: ''};</script><script defer src="sidebar-items.js"></script>
+    </nav>
+
+    <nav class="sub">
+        <form class="search-form js-only">
+            <div class="search-container">
+                <input class="search-input" name="search"
+                       autocomplete="off"
+                       placeholder="Click or press ‘S’ to search, ‘?’ for more options…"
+                       type="search">
+            </div>
+        </form>
+    </nav>
+
+    <section id='main' class="content trait">
+<h1 class='fqn'><span class='in-band'>Trait <a href='../index.html'>tbd</a>::<wbr><a href='index.html'>log</a>::<wbr><a class='trait' href=''>Log</a></span><span class='out-of-band'><span id='render-detail'>
+            <a id="toggle-all-docs" href="javascript:void(0)" title="collapse all docs">
+                [<span class='inner'>&#x2212;</span>]
+            </a>
+        </span><a id='src-182' class='srclink' href='../../src/tbd/src/log.rs.html#110-131' title='goto source code'>[src]</a></span></h1>
+<pre class='rust trait'>pub trait Log {
+    type Item: <a class='trait' href='../../tbd/log/trait.Hashable.html' title='tbd::log::Hashable'>Hashable</a>;
+    fn <a href='#tymethod.new' class='fnname'>new</a>() -&gt; Self;
+    fn <a href='#tymethod.push' class='fnname'>push</a>(&amp;mut self, Self::<a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Item</a>) -&gt; <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>;
+    fn <a href='#tymethod.head_hash' class='fnname'>head_hash</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>&gt;;
+    fn <a href='#tymethod.parent_hash' class='fnname'>parent_hash</a>(&amp;self, hash: <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>&gt;;
+    fn <a href='#tymethod.get' class='fnname'>get</a>(&amp;self, hash: <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;Self::<a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Item</a>&gt;;
+    fn <a href='#tymethod.get_mut' class='fnname'>get_mut</a>(&amp;mut self, hash: <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;mut Self::<a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Item</a>&gt;;
+}</pre><div class='docblock'><p>Contains a ordered set of entries and use a way to verify them.</p>
+</div>
+            <h2 id='associated-types'>Associated Types</h2>
+            <div class='methods'>
+        <h3 id='associatedtype.Item' class='method stab '><code>type Item: <a class='trait' href='../../tbd/log/trait.Hashable.html' title='tbd::log::Hashable'>Hashable</a></code></h3></div>
+            <h2 id='required-methods'>Required Methods</h2>
+            <div class='methods'>
+        <h3 id='tymethod.new' class='method stab '><code>fn <a href='#tymethod.new' class='fnname'>new</a>() -&gt; Self</code></h3><div class='docblock'><p>Create a new log</p>
+</div><h3 id='tymethod.push' class='method stab '><code>fn <a href='#tymethod.push' class='fnname'>push</a>(&amp;mut self, Self::<a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Item</a>) -&gt; <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a></code></h3><div class='docblock'><p>Add new entry to the log</p>
+</div><h3 id='tymethod.head_hash' class='method stab '><code>fn <a href='#tymethod.head_hash' class='fnname'>head_hash</a>(&amp;self) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>&gt;</code></h3><div class='docblock'><p>Head hash</p>
+</div><h3 id='tymethod.parent_hash' class='method stab '><code>fn <a href='#tymethod.parent_hash' class='fnname'>parent_hash</a>(&amp;self, hash: <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;<a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>&gt;</code></h3><div class='docblock'><p>Get the parent hash of the given hash</p>
+</div><h3 id='tymethod.get' class='method stab '><code>fn <a href='#tymethod.get' class='fnname'>get</a>(&amp;self, hash: <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;Self::<a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Item</a>&gt;</code></h3><div class='docblock'><p>Get the borrowed entry of the given hash</p>
+</div><h3 id='tymethod.get_mut' class='method stab '><code>fn <a href='#tymethod.get_mut' class='fnname'>get_mut</a>(&amp;mut self, hash: <a class='enum' href='../../tbd/log/enum.Hash.html' title='tbd::log::Hash'>Hash</a>) -&gt; <a class='enum' href='https://doc.rust-lang.org/nightly/core/option/enum.Option.html' title='core::option::Option'>Option</a>&lt;&amp;mut Self::<a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Item</a>&gt;</code></h3><div class='docblock'><p>Get a mutable entry of the given hash</p>
+</div></div>
+        <h2 id='implementors'>Implementors</h2>
+        <ul class='item-list' id='implementors-list'>
+    <li><code>impl&lt;T: <a class='trait' href='../../tbd/log/trait.Hashable.html' title='tbd::log::Hashable'>Hashable</a>&gt; <a class='trait' href='../../tbd/log/trait.Log.html' title='tbd::log::Log'>Log</a> for <a class='struct' href='../../tbd/log/struct.DefaultLog.html' title='tbd::log::DefaultLog'>DefaultLog</a>&lt;T&gt;</code></li>
+</ul><script type="text/javascript" async
+                              src="../../implementors/tbd/log/trait.Log.js">
+                      </script></section>
+    <section id='search' class="content hidden"></section>
+
+    <section class="footer"></section>
+
+    <aside id="help" class="hidden">
+        <div>
+            <h1 class="hidden">Help</h1>
+
+            <div class="shortcuts">
+                <h2>Keyboard Shortcuts</h2>
+
+                <dl>
+                    <dt>?</dt>
+                    <dd>Show this help dialog</dd>
+                    <dt>S</dt>
+                    <dd>Focus the search field</dd>
+                    <dt>&larrb;</dt>
+                    <dd>Move up in search results</dd>
+                    <dt>&rarrb;</dt>
+                    <dd>Move down in search results</dd>
+                    <dt>&#9166;</dt>
+                    <dd>Go to active search result</dd>
+                </dl>
+            </div>
+
+            <div class="infos">
+                <h2>Search Tricks</h2>
+
+                <p>
+                    Prefix searches with a type followed by a colon (e.g.
+                    <code>fn:</code>) to restrict the search to a given type.
+                </p>
+
+                <p>
+                    Accepted types are: <code>fn</code>, <code>mod</code>,
+                    <code>struct</code>, <code>enum</code>,
+                    <code>trait</code>, <code>type</code>, <code>macro</code>,
+                    and <code>const</code>.
+                </p>
+
+                <p>
+                    Search functions by type signature (e.g.
+                    <code>vec -> usize</code> or <code>* -> vec</code>)
+                </p>
+            </div>
+        </div>
+    </aside>
+
+    
+
+    <script>
+        window.rootPath = "../../";
+        window.currentCrate = "tbd";
+        window.playgroundUrl = "";
+    </script>
+    <script src="../../jquery.js"></script>
+    <script src="../../main.js"></script>
+    
+    <script defer src="../../search-index.js"></script>
+</body>
+</html>

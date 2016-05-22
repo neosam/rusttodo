@@ -182,6 +182,27 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorRef<'a, L, T>
 }
 
 
+/// Iterator which iterates over the hashes of a log.
+///
+/// ```
+/// use tbd::log::*;
+/// let mut log = DefaultLog::<String>::new();
+///
+/// log.push("str1".to_string());
+/// log.push("str2".to_string());
+///
+/// let mut log_iter = LogIteratorHash::from_log(&log);
+/// let mut res: Vec<Hash> = Vec::new();
+/// for hash in log_iter {
+///     res.push(hash);
+/// }
+///
+/// assert_eq!(2, res.len());
+/// assert_eq!("2c72c3d0cb9c97242f6b3157a75d2ff04e368d6355a5ac650c2c0d6e1eb192ee",
+///             res[0].as_string());
+/// assert_eq!("43509d8f3af5d7507ab9c90bee7e54602f6103adb4f4a40cc069bbf1aebf2e6c",
+///             res[1].as_string());
+/// ```
 pub struct LogIteratorHash<'a, L: Log<Item=T> + 'a, T: Hashable> {
     log: &'a L,
     hash: Option<Hash>

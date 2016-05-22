@@ -102,6 +102,7 @@ use std::io::{Write};
 use self::crypto::sha3::Sha3;
 use self::crypto::digest::Digest;
 use std::collections::BTreeMap;
+use self::byteorder::{BigEndian, ByteOrder};
 
 
 // ---- Core types ----
@@ -131,6 +132,26 @@ pub trait Log {
 }
 
 
+/// Iterate over the elements of any log.
+///
+/// # Examples
+/// ```
+/// use tbd::log::*;
+/// let mut log = DefaultLog::<String>::new();
+///
+/// log.push("str1".to_string());
+/// log.push("str2".to_string());
+///
+/// let mut log_iter = LogIteratorRef::from_log(&log);
+/// let mut res: Vec<String> = Vec::new();
+/// for my_str in log_iter {
+///     res.push(my_str.clone());
+/// }
+///
+/// assert_eq!(2, res.len());
+/// assert_eq!("str2", res[0]);
+/// assert_eq!("str1", res[1]);
+/// ```
 pub struct LogIteratorRef<'a, L: Log<Item=T> + 'a, T: Hashable> {
     log: &'a L,
     hash: Option<Hash>
@@ -370,7 +391,7 @@ impl<T: Hashable> Log for DefaultLog<T> {
 ///
 /// It also implements the Hashable type by default and generates
 /// a sha3 representation of its output.
-pub trait Writable: Hashable {
+pub trait Writable {
     fn write_to(&self, write: &mut Write);
     fn writeable_to_hash(&self) -> Hash {
         let mut write: Vec<u8> = Vec::new();
@@ -385,5 +406,24 @@ pub trait Writable: Hashable {
     }
 }
 
+fn usize_to_u32_bytes(x: usize) -> [u8; 4] {
+    let as_u32 = x as u32;
+    let mut res = [0u8; 4];
+    BigEndian::write_u32(&mut res, as_u32);
+    res
+}
 
+impl Writable for String {
+    fn write_to(&self, write: &mut Write) {
+        let str_bytes = self.as_bytes();
+        let len = usize_to_u32_bytes(str_bytes.len());
+        write.write(&len);
+        write.write(&str_bytes);
+    }
+}
 
+impl Hashable for String {
+    fn as_hash(&self) -> Hash {
+        self.writeable_to_hash()
+    }
+}

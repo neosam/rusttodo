@@ -236,6 +236,18 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorHash<'a, L, T
 // ---- Defining HashLog types
 
 /// Stores one of the supported hash values.
+///
+/// # Examples
+/// ```
+/// use tbd::log::*;
+///
+/// // Generate a hash using hash_bytes which generates a sha3-256 hash.
+/// let hash = Hash::hash_bytes(&"foo".to_string().as_bytes());
+///
+/// // Can generate a string representation
+/// assert_eq!("76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01",
+///                  hash.as_string());
+/// ```
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Hash {
     None,

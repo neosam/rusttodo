@@ -16,81 +16,71 @@
 //! # Examples
 //!
 //! ```
+//! // Load helpful macros by adding the macro_use tag.
+//! #[macro_use] extern crate tbd;
+//!
 //! use tbd::log::*;
-//! use std::io::Write;
 //!
 //! // Defining the type we want to store.  Lets use a simple struct which
 //! // stores a byte for this example.
+//! #[derive(Debug)]
 //! struct MyStruct {
 //!    x: u8
 //! }
 //!
-//! // Implement the Writable trait.  We need it for two reasons:
-//! // 1. For serialization to save it.
-//! // 2. To generate a hash value.
-//! impl Writable for MyStruct {
-//!    fn write_to(&self, write: &mut Write) {
-//!       let byte = [self.x];
-//!       write.write(&byte);
-//!    }
+//! // Make the struct Hashable.  Then it can be used for the Log types.
+//! hashable_for_debug!(MyStruct);
+//!
+//!
+//! fn main() {
+//!     // Create new log object.  DefaultLog is the standard implementation
+//!     // which also provides support to store and load entries and for iterators.
+//!     let mut log: DefaultLog<MyStruct> = DefaultLog::new();
+//!
+//!     // Add some entries
+//!     let first_hash: Hash = log.push(MyStruct{x: 42});
+//!     let second_hash: Hash = log.push(MyStruct{x: 23});
+//!
+//!     // The push method returns the hash value which can be used as key.
+//!     assert_eq!("5c9fd46aeb2781bb9ec9e5263cca012a4ea4632f2ac99991c8f430e2d051d268",
+//!                    &first_hash.as_string());
+//!     assert_eq!("a63ffbc7a358a3556a84531c55647ec9aeb4ca6e0a78edba86511c48c4bca1bd",
+//!                    &second_hash.as_string());
+//!
+//!     // Inserting the same value again gives a completely different hash because
+//!     // the hash also contains the previous entry.
+//!     let third_hash: Hash = log.push(MyStruct{x: 23});
+//!     assert_eq!("5fb3153625b7e41f791f81f4df593f15f8810034322e85916961578d0fbec635",
+//!                    &third_hash.as_string());
+//!
+//!     // With get, we can borrow the entries using the hashes received from the
+//!     // push method.
+//!     assert_eq!(42, log.get(first_hash).unwrap().x);
+//!     assert_eq!(23, log.get(second_hash).unwrap().x);
+//!     assert_eq!(23, log.get(third_hash).unwrap().x);
+//!
+//!     // Iterate over the entries
+//!     // This log operates like a stack and will return the last (latest)
+//!     // entry first.
+//!     let mut res = Vec::<u8>::new();
+//!     for item in log.iter() {
+//!         res.push(item.x);
+//!     }
+//!
+//!     assert_eq!(23, res[0]);
+//!     assert_eq!(23, res[1]);
+//!     assert_eq!(42, res[2]);
+//!
+//!     // We can also iterate over the hashes.  Lets collect all in a Vec.
+//!     let mut hashes: Vec<Hash> = log.hash_iter().collect();
+//!     assert_eq!(3, hashes.len());
+//!     assert_eq!("5fb3153625b7e41f791f81f4df593f15f8810034322e85916961578d0fbec635",
+//!                    &hashes[0].as_string());
+//!     assert_eq!("a63ffbc7a358a3556a84531c55647ec9aeb4ca6e0a78edba86511c48c4bca1bd",
+//!                    &hashes[1].as_string());
+//!     assert_eq!("5c9fd46aeb2781bb9ec9e5263cca012a4ea4632f2ac99991c8f430e2d051d268",
+//!                    &hashes[2].as_string());
 //! }
-//!
-//! // Make our type Hashable so we can store it in the Log.
-//! // Use the helper function writeable_to_hash to implement as_hash()
-//! impl Hashable for MyStruct {
-//!    fn as_hash(&self) -> Hash {
-//!       self.writeable_to_hash()
-//!    }
-//! }
-//!
-//! // Create new log object.  DefaultLog is the standard implementation
-//! // which also provides support to store and load entries and for iterators.
-//! let mut log: DefaultLog<MyStruct> = DefaultLog::new();
-//!
-//! // Add some entries
-//! let first_hash: Hash = log.push(MyStruct{x: 42});
-//! let second_hash: Hash = log.push(MyStruct{x: 23});
-//!
-//! // The push method returns the hash value which can be used as key.
-//! assert_eq!("377194384a7432ebd8d8e0f19a1bcc17f115a220d48e280f8d75b6a5b43c3e1d",
-//!                &first_hash.as_string());
-//! assert_eq!("5894a38091d60a64cb6396edc2662c6460c3685b78b4381051dbc15ff30c5bcc",
-//!                &second_hash.as_string());
-//!
-//! // Inserting the same value again gives a completely different hash because
-//! // the hash also contains the previous entry.
-//! let third_hash: Hash = log.push(MyStruct{x: 23});
-//! assert_eq!("f87fa51292d72bb55a842b3f46c83adf71720a89abc3c7d89494d84458b57861",
-//!                &third_hash.as_string());
-//!
-//! // With get, we can borrow the entries using the hashes received from the
-//! // push method.
-//! assert_eq!(42, log.get(first_hash).unwrap().x);
-//! assert_eq!(23, log.get(second_hash).unwrap().x);
-//! assert_eq!(23, log.get(third_hash).unwrap().x);
-//!
-//! // Iterate over the entries
-//! // This log operates like a stack and will return the last (latest)
-//! // entry first.
-//! let mut res = Vec::<u8>::new();
-//! for item in log.iter() {
-//!     res.push(item.x);
-//! }
-//!
-//! assert_eq!(23, res[0]);
-//! assert_eq!(23, res[1]);
-//! assert_eq!(42, res[2]);
-//!
-//! // We can also iterate over the hashes.  Lets collect all in a Vec.
-//! let mut hashes: Vec<Hash> = log.hash_iter().collect();
-//! assert_eq!(3, hashes.len());
-//! assert_eq!("f87fa51292d72bb55a842b3f46c83adf71720a89abc3c7d89494d84458b57861",
-//!                &hashes[0].as_string());
-//! assert_eq!("5894a38091d60a64cb6396edc2662c6460c3685b78b4381051dbc15ff30c5bcc",
-//!                &hashes[1].as_string());
-//! assert_eq!("377194384a7432ebd8d8e0f19a1bcc17f115a220d48e280f8d75b6a5b43c3e1d",
-//!                &hashes[2].as_string());
-//! 
 //! ```
 
 
@@ -439,6 +429,90 @@ pub trait Writable {
     }
 }
 
+
+/// Implement Hashable for any Writable
+///
+/// This macro generates a valid Hashable implementation
+/// for any Writable type.
+///
+/// # Examples
+/// ```
+/// #[macro_use] extern crate tbd;
+///
+/// use tbd::log::*;
+/// use std::io::Write;
+///
+/// struct A {
+///    x: u8
+/// }
+///
+/// impl Writable for A {
+///     fn write_to(&self, write: &mut Write) {
+///         let byte = [self.x];
+///         write.write(&byte);
+///     }
+/// }
+///
+/// hashable_for_writable!(A);
+///
+/// fn main() {
+///     let a = A {x: 42u8};
+///     // Can generate a hash now
+///     let hash: Hash = a.as_hash();
+///     assert_eq!("82283b4b030589a7aa0ca28b8e933ac0bd89738a0df509806c864366deec31d7",
+///                   hash.as_string());
+/// }
+/// ```
+#[macro_export]
+macro_rules! hashable_for_writable {
+    ($writable_type:path) => {
+        impl Hashable for $writable_type {
+            fn as_hash(&self) -> Hash {
+                self.writeable_to_hash()
+            }
+        }
+    }
+}
+
+/// Implement Hashable for any Debug
+///
+/// This macro generates a valid Hashable implementation
+/// for any Debug type.  This can be handy since Debug can automatically
+/// implemented by the compiler.
+///
+/// # Examples
+/// ```
+/// #[macro_use] extern crate tbd;
+///
+/// use tbd::log::*;
+///
+/// #[derive(Debug)]
+/// struct A {
+///    x: u8
+/// }
+/// hashable_for_debug!(A);
+///
+/// fn main() {
+///     let a = A {x: 42u8};
+///     // Can generate a hash now
+///     let hash: Hash = a.as_hash();
+///     assert_eq!("dbd0820fbce3804d3edc974e8e31cdee04172029528ea50b25db44356911fac1",
+///                   hash.as_string());
+/// }
+/// ```
+#[macro_export]
+macro_rules! hashable_for_debug {
+    ($debug_type:path) => {
+        impl Hashable for $debug_type {
+            fn as_hash(&self) -> Hash {
+                let string_value = format!("{:?}", self);
+                Hash::hash_bytes(string_value.as_bytes())
+            }
+        }
+    }
+}
+
+
 fn usize_to_u32_bytes(x: usize) -> [u8; 4] {
     let as_u32 = x as u32;
     let mut res = [0u8; 4];
@@ -450,13 +524,9 @@ impl Writable for String {
     fn write_to(&self, write: &mut Write) {
         let str_bytes = self.as_bytes();
         let len = usize_to_u32_bytes(str_bytes.len());
-        write.write(&len);
-        write.write(&str_bytes);
+        write.write(&len).expect("Could not write length of String");
+        write.write(&str_bytes).expect("Could not write String bytes");
     }
 }
 
-impl Hashable for String {
-    fn as_hash(&self) -> Hash {
-        self.writeable_to_hash()
-    }
-}
+hashable_for_writable!(String);

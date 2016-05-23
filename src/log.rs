@@ -530,3 +530,82 @@ impl Writable for String {
 }
 
 hashable_for_writable!(String);
+
+pub struct LogVerifyError<'a, T: 'a> {
+    pub t: Option<&'a T>,
+    pub actual_hash: Hash,
+    pub expected_hash: Hash
+}
+
+fn gen_verify_error<'a, T>(t: Option<&'a T>, act: Hash, exp: Hash)
+                           -> LogVerifyError<'a, T> {
+    LogVerifyError {
+        t: t,
+        actual_hash: act,
+        expected_hash: exp
+    }
+}
+
+
+/// Verifies if the hash values of all entries are correct.
+///
+/// # Examples
+/// ```
+/// #[macro_use] extern crate tbd;
+/// use tbd::log::*;
+///
+/// #[derive(Debug)] struct A {x: u32}
+/// hashable_for_debug!(A);
+///
+/// fn main() {
+///    let mut log = DefaultLog::<A>::new();
+///    log.push(A{x: 1});
+///    let entry_hash = log.push(A{x: 2});
+///
+///    // Expect the hashes in the logs are correct since no entries were
+///    // modified.
+///    match verify_log(&log) {
+///        None => (),
+///        Some(_) => panic!("Expected no error")
+///    }
+///
+///    // Now lets manipulate some data
+///    match log.get_mut(entry_hash) {
+///        None => panic!("Expected an entry here, gave valid hash"),
+///        Some(entry) => entry.x = 3
+///    }
+///
+///    match verify_log(&log) {
+///        None => panic!("This time, verification should fail"),
+///        Some(error) => {
+///            assert_eq!("8da97bd9319b3eddb72c4f1e4b455090f69ee415dedde4e08e45ab31d9982d07",
+///                              error.expected_hash.as_string());
+///            assert_eq!("3b334afb2dad9ebbcdd0654f01b1ba3d55c55442a6d9bcbcc26afeec5a395530",
+///                              error.actual_hash.as_string());
+///            assert_eq!(error.t.unwrap().x, 3);
+///        }
+///    }
+/// }
+///
+/// ```
+pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyError<T>>
+        where L: Log<Item=T>, T: Hashable {
+    let hashes: Vec<Hash> = LogIteratorHash::from_log(log).collect();
+    for hash in hashes.iter().rev() {
+        let parent_hash_option = log.parent_hash(*hash);
+        let entry = match log.get(*hash) {
+            None => return Some(gen_verify_error(None, *hash, Hash::None)),
+            Some(hash) => hash
+        };
+        let entry_hash = entry.as_hash();
+        let expected_hash = match parent_hash_option {
+            None => entry_hash.as_hash(),
+            Some(parent_hash) => entry_hash.hash_with(parent_hash)
+        };
+
+        if *hash != expected_hash {
+            return Some(gen_verify_error(Some(entry), *hash, expected_hash));
+        }
+    }
+    None
+}

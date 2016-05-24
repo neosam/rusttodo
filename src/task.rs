@@ -1,4 +1,64 @@
 //! Task management library
+//!
+//! This is the core tbd library.  Features are:
+//! * Adding tasks with a deadline
+//! * Adding pooled task which are randomly picked.
+//! * Mark task as completed.
+//!
+//! # Examples
+//! ```
+//! extern crate tbd;
+//! use tbd::task::*;
+//!
+//! fn main() {
+//!     // Create main task management object
+//!     let mut task_stat = TaskStat::empty_task_stat();
+//!
+//!     // Add an active task
+//!     task_stat.add_active_task(
+//!         // Task title
+//!         "A task".to_string(),
+//!         // More detailed task description
+//!         "A more detailed description of the task".to_string(),
+//!         // Importance factor
+//!         1.0,
+//!         // Task deadline is in three days
+//!         3
+//!     );
+//!
+//!     // Add a pooled task
+//!     task_stat.add_pooled_task(
+//!         // Task title
+//!         "Pooled task".to_string(),
+//!         // A more detailed description
+//!         "A description for the pooled task".to_string(),
+//!         // Importance factor
+//!         1.0,
+//!         // Propability the task is picked (0 = never, 1 = always)
+//!         0.5,
+//!         // Never pick this task three days until it's finished
+//!         3,
+//!         // Have five days to complete the task after it was picked
+//!         5
+//!     );
+//!
+//!     // Should have the first task as active task
+//!     assert_eq!("A task", task_stat.all_actives()[0].task.title);
+//!     // Should also have the second task as pooled task
+//!     assert_eq!("Pooled task", task_stat.all_pooled()[0].task.title);
+//!
+//!     // Mark the active task as completed
+//!     assert_eq!(true, task_stat.mark_done("A task".to_string()));
+//!     // Method returns false if task was not found
+//!     assert_eq!(false, task_stat.mark_done("Foo".to_string()));
+//!     // "A task" is now removed
+//!     assert_eq!(false, task_stat.mark_done("A task".to_string()));
+//!
+//!     // Active tasks should be empty now
+//!     assert_eq!(0, task_stat.all_actives().len());
+//! }
+//! ```
+
 //#![warn(missing_docs)]
 
 extern crate time;
@@ -7,16 +67,12 @@ extern crate rand;
 use self::time::Duration;
 use std::collections::BTreeMap;
 
-pub type FactorT = f32;
-pub type CooldownT = i16;
-pub type DueDaysT = i16;
-
 /// Base task type
 #[derive(Clone)]
 pub struct Task {
     pub title: String,
     pub description: String,
-    pub factor: FactorT
+    pub factor: f32
 }
 
 /// A task which got activated.
@@ -31,9 +87,9 @@ pub struct ActiveTask {
 #[derive(Clone)]
 pub struct PooledTask {
     pub task: Task,
-    pub propability: FactorT,
-    pub cool_down: CooldownT,
-    pub due_days: DueDaysT,
+    pub propability: f32,
+    pub cool_down: i16,
+    pub due_days: i16,
     pub cooling_until: time::Tm
 }
 
@@ -60,10 +116,10 @@ impl ActiveTask {
 
 pub trait TaskStatTrait {
     fn add_active_task(&mut self, title: String, description: String,
-                       factor: FactorT, due_days: i16) -> ActiveTask;
+                       factor: f32, due_days: i16) -> ActiveTask;
     fn add_pooled_task(&mut self, title: String, description: String,
-                       factor: FactorT, propability: FactorT,
-                       cool_down: CooldownT, due_days: DueDaysT) -> PooledTask;
+                       factor: f32, propability: f32,
+                       cool_down: i16, due_days: i16) -> PooledTask;
     fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Vec<ActiveTask>;
     fn mark_done(&mut self, title: String) -> bool;
     fn all_actives(&self) -> Vec<ActiveTask>;
@@ -179,7 +235,7 @@ impl TaskStatTrait for TaskStat {
     fn add_active_task(&mut self,
                            title: String,
                            description: String,
-                           factor: FactorT,
+                           factor: f32,
                            due_days: i16) -> ActiveTask {
         floor_tm_day(&mut self.ref_tm);
         let duration = Duration::days(due_days as i64);
@@ -198,8 +254,8 @@ impl TaskStatTrait for TaskStat {
     }
 
     fn add_pooled_task(&mut self, title: String, description: String,
-                       factor: FactorT, propability: FactorT,
-                       cool_down: CooldownT, due_days: DueDaysT) -> PooledTask {
+                       factor: f32, propability: f32,
+                       cool_down: i16, due_days: i16) -> PooledTask {
         floor_tm_day(&mut self.ref_tm);
         let p_task = PooledTask {
             task: Task {

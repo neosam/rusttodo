@@ -148,6 +148,7 @@ pub struct LogIteratorRef<'a, L: Log<Item=T> + 'a, T: Hashable> {
 }
 
 impl<'a, L: Log<Item=T>, T: Hashable + 'a> LogIteratorRef<'a, L, T> {
+    /// Returns an iterator for the given Log.
     pub fn from_log(log: &'a L) -> LogIteratorRef<'a, L, T> {
         LogIteratorRef {
             log: log,
@@ -199,6 +200,7 @@ pub struct LogIteratorHash<'a, L: Log<Item=T> + 'a, T: Hashable> {
 }
 
 impl<'a, L: Log<Item=T>, T: Hashable + 'a> LogIteratorHash<'a, L, T> {
+    /// Returns an iterator for the given Log which provides the hashes.
     pub fn from_log(log: &'a L) -> LogIteratorHash<'a, L, T> {
         LogIteratorHash {
             log: log,
@@ -290,10 +292,12 @@ impl Hash {
         }
     }
 
+    /// Returns the bytes of the hash as hex String.
     pub fn as_string(&self) -> String {
         bytes_to_string(&*self.get_bytes())
     }
 
+    /// Returns a sha3-256 hash of the byte array.
     pub fn hash_bytes(bytes: &[u8]) -> Hash {
         let mut sha3 = Sha3::sha3_256();
         sha3.input(bytes);
@@ -302,6 +306,7 @@ impl Hash {
         Hash::Sha3(res)
     }
 
+    /// Generate a new hash by compining this hash with another one.
     pub fn hash_with(&self, o: Hash) -> Hash {
         let mut vec: Vec<u8> = Vec::new();
         vec.extend_from_slice(&*self.get_bytes());
@@ -321,12 +326,24 @@ impl Hashable for Hash {
     }
 }
 
+
+
+
+// ---- DefaultLogEntry implementations ----
+
+/// Type for each entry of the DefaultLog.
 pub struct DefaultLogEntry<T: Hashable> {
-    entry: T,
-    parent_hash: Option<Hash>
+    /// Holds the actial entry.
+    pub entry: T,
+
+    /// Reference to the parent.
+    pub parent_hash: Option<Hash>
 }
 
-
+/// Default implmentation of the Log.
+///
+/// It already provides functions to generate iterators for its entries and
+/// hashes.
 pub struct DefaultLog<T: Hashable> {
     entries: BTreeMap<Hash, DefaultLogEntry<T>>,
     head: Option<Hash>,
@@ -335,19 +352,25 @@ pub struct DefaultLog<T: Hashable> {
 }
 
 impl<T: Hashable> DefaultLog<T> {
+    /// Get the iterator for the entries.
     pub fn iter(&self) -> LogIteratorRef<DefaultLog<T>, T> {
         LogIteratorRef::from_log(self)
     }
 
+    /// Get an iterator for the hashes.
     pub fn hash_iter(&self) -> LogIteratorHash<DefaultLog<T>, T> {
         LogIteratorHash::from_log(self)
     }
 
+    /// Set load function called when an entry was not found.
     pub fn with_load_fn(mut self, load_fn: Box<Fn(Hash) -> Option<DefaultLogEntry<T>>>) -> DefaultLog<T> {
         self.load = load_fn;
         self
     }
 
+    /// Set load function when entries should be saved.
+    ///
+    /// This is not used yet.
     pub fn with_save_fn(mut self, save_fn: Box<Fn(&DefaultLogEntry<T>)>) -> DefaultLog<T> {
         self.save = save_fn;
         self
@@ -357,6 +380,7 @@ impl<T: Hashable> DefaultLog<T> {
 impl<T: Hashable> Log for DefaultLog<T> {
     type Item = T;
 
+    /// Create empty log.
     fn new() -> Self {
         DefaultLog {
             entries: BTreeMap::new(),
@@ -366,6 +390,7 @@ impl<T: Hashable> Log for DefaultLog<T> {
         }
     }
 
+    /// Add new entry to log.
     fn push(&mut self, t: T) -> Hash {
         let entry_hash = t.as_hash();
         let hash = match self.head {
@@ -381,10 +406,16 @@ impl<T: Hashable> Log for DefaultLog<T> {
         hash
     }
 
+    /// Get the hash of the newest entry if not empty.
+    ///
+    /// Returns None if it's empty.
     fn head_hash(&self) -> Option<Hash> {
         self.head
     }
 
+    /// Get the parent hash of the given hash if available.
+    ///
+    /// Returns None if parameter hash was not found or if it was empty.
     fn parent_hash(&self, hash: Hash) -> Option<Hash> {
         match self.entries.get(&hash) {
             None => None,

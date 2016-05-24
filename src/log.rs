@@ -93,6 +93,8 @@ use self::crypto::sha3::Sha3;
 use self::crypto::digest::Digest;
 use std::collections::BTreeMap;
 use self::byteorder::{BigEndian, ByteOrder};
+use std::error::Error;
+use std::fmt;
 
 
 // ---- Core types ----
@@ -101,7 +103,7 @@ use self::byteorder::{BigEndian, ByteOrder};
 pub trait Log {
     type Item: Hashable;
 
-    /// Create a new log
+    /// Create an empty log
     fn new() -> Self;
 
     /// Add new entry to the log
@@ -111,14 +113,26 @@ pub trait Log {
     /// Head hash
     fn head_hash(&self) -> Option<Hash>;
 
-    /// Get the parent hash of the given hash
-    fn parent_hash(&self, hash: Hash) -> Option<Hash>;
+    /// Get the parent hash of the given hash.
+    ///
+    /// If the given hash is the first entry without a successor, it returns
+    /// None, otherwise it returns the hash wrapped in Option::Some.
+    ///
+    /// # Errors
+    /// Throws an error if an entry of the hash was not found.
+    fn parent_hash(&self, hash: Hash) -> Result<Option<Hash>, LogError>;
 
     /// Get the borrowed entry of the given hash
-    fn get(&self, hash: Hash) -> Option<&Self::Item>;
+    ///
+    /// # Errors
+    /// Throws an error if an entry of the hash was not found.
+    fn get(&self, hash: Hash) -> Result<&Self::Item, LogError>;
 
     /// Get a mutable entry of the given hash
-    fn get_mut(&mut self, hash: Hash) -> Option<&mut Self::Item>;
+    ///
+    /// # Errors
+    /// Throws an error if an entry of the hash was not found.
+    fn get_mut(&mut self, hash: Hash) -> Result<&mut Self::Item, LogError>;
 }
 
 
@@ -164,8 +178,8 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorRef<'a, L, T>
         match self.hash {
             None => None,
             Some(hash) => {
-                let value = self.log.get(hash);
-                self.hash = self.log.parent_hash(hash);
+                let value = self.log.get(hash).ok();
+                self.hash = self.log.parent_hash(hash).unwrap_or(None);
                 value
             }
         }
@@ -217,7 +231,7 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorHash<'a, L, T
             None => None,
             Some(hash) => {
                 let value = self.hash;
-                self.hash = self.log.parent_hash(hash);
+                self.hash = self.log.parent_hash(hash).unwrap_or(None);
                 value
             }
         }
@@ -240,7 +254,7 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorHash<'a, L, T
 /// assert_eq!("76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01",
 ///                  hash.as_string());
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Hash {
     None,
     Sha3([u8; 32])
@@ -330,6 +344,29 @@ impl Hashable for Hash {
 
 
 // ---- DefaultLogEntry implementations ----
+/// Error type for the default log.
+#[derive(Debug)]
+pub enum LogError {
+    EntryNotFound(Hash)
+}
+
+impl fmt::Display for LogError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LogError::EntryNotFound(hash) => write!(f, "Entry not found for hash: {}",
+                                          hash.as_string())
+        }
+    }
+}
+
+impl Error for LogError {
+    fn description(&self) -> &str {
+        match *self {
+            LogError::EntryNotFound(_) => "Entry for hash not found"
+        }
+    }
+}
+
 
 /// Type for each entry of the DefaultLog.
 pub struct DefaultLogEntry<T: Hashable> {
@@ -391,6 +428,8 @@ impl<T: Hashable> Log for DefaultLog<T> {
     }
 
     /// Add new entry to log.
+    ///
+    /// Returns the hash value for the entry.
     fn push(&mut self, t: T) -> Hash {
         let entry_hash = t.as_hash();
         let hash = match self.head {
@@ -416,24 +455,25 @@ impl<T: Hashable> Log for DefaultLog<T> {
     /// Get the parent hash of the given hash if available.
     ///
     /// Returns None if parameter hash was not found or if it was empty.
-    fn parent_hash(&self, hash: Hash) -> Option<Hash> {
+    fn parent_hash(&self, hash: Hash) -> Result<Option<Hash>, LogError> {
         match self.entries.get(&hash) {
-            None => None,
-            Some(ref entry) => entry.parent_hash
+            None => Result::Err(LogError::EntryNotFound(hash)),
+            Some(ref entry) => Ok(entry.parent_hash)
         }
     }
 
-    fn get(&self, hash: Hash) -> Option<&Self::Item> {
+    /// Get entry with 
+    fn get(&self, hash: Hash) -> Result<&Self::Item, LogError> {
         match self.entries.get(&hash) {
-            None => None,
-            Some(ref entry) => Some(&entry.entry)
+            None => Result::Err(LogError::EntryNotFound(hash)),
+            Some(ref entry) => Ok(&entry.entry)
         }
     }
 
-    fn get_mut(&mut self, hash: Hash) -> Option<&mut Self::Item> {
+    fn get_mut(&mut self, hash: Hash) -> Result<&mut Self::Item, LogError> {
         match self.entries.get_mut(&hash) {
-            None => None,
-            Some(entry) => Some(&mut entry.entry)
+            None => Result::Err(LogError::EntryNotFound(hash)),
+            Some(entry) => Ok(&mut entry.entry)
         }
     }
 }
@@ -562,15 +602,18 @@ impl Writable for String {
 
 hashable_for_writable!(String);
 
-pub struct LogVerifyError<'a, T: 'a> {
-    pub t: Option<&'a T>,
-    pub actual_hash: Hash,
-    pub expected_hash: Hash
+pub enum LogVerifyFailure<'a, T: 'a> {
+    LogHashFailure {
+        t: &'a T,
+        actual_hash: Hash,
+        expected_hash: Hash
+    },
+    LogError(LogError)
 }
 
-fn gen_verify_error<'a, T>(t: Option<&'a T>, act: Hash, exp: Hash)
-                           -> LogVerifyError<'a, T> {
-    LogVerifyError {
+fn gen_verify_failure<'a, T>(t: &'a T, act: Hash, exp: Hash)
+                           -> LogVerifyFailure<'a, T> {
+    LogVerifyFailure::LogHashFailure {
         t: t,
         actual_hash: act,
         expected_hash: exp
@@ -596,46 +639,61 @@ fn gen_verify_error<'a, T>(t: Option<&'a T>, act: Hash, exp: Hash)
 ///    // Expect the hashes in the logs are correct since no entries were
 ///    // modified.
 ///    match verify_log(&log) {
+///        // None means, no errors found
 ///        None => (),
-///        Some(_) => panic!("Expected no error")
+///        // Some means that something is not correct.
+///        Some(_) => panic!("Expected no error if nothing was maniputated")
 ///    }
 ///
 ///    // Now lets manipulate some data
 ///    match log.get_mut(entry_hash) {
-///        None => panic!("Expected an entry here, gave valid hash"),
-///        Some(entry) => entry.x = 3
+///        Err(_) => panic!("Expected an entry here, gave valid hash"),
+///        Ok(entry) => entry.x = 3
 ///    }
 ///
+///    // Verify again and it should find maniputation in the data.
 ///    match verify_log(&log) {
+///        // None would mean that still everything is ok.
 ///        None => panic!("This time, verification should fail"),
-///        Some(error) => {
-///            assert_eq!("8da97bd9319b3eddb72c4f1e4b455090f69ee415dedde4e08e45ab31d9982d07",
-///                              error.expected_hash.as_string());
-///            assert_eq!("3b334afb2dad9ebbcdd0654f01b1ba3d55c55442a6d9bcbcc26afeec5a395530",
-///                              error.actual_hash.as_string());
-///            assert_eq!(error.t.unwrap().x, 3);
+///        // Some means an issue is was found.
+///        // This can either be an error while accessing the log entries
+///        // or a LogHashFailure which indicates maniputation. 
+///        Some(fail) => match fail {
+///            // Expecting maniputation and so a LogHashFailure.
+///            LogVerifyFailure::LogHashFailure{t: t, expected_hash: exp, actual_hash: act} => {
+///                assert_eq!("8da97bd9319b3eddb72c4f1e4b455090f69ee415dedde4e08e45ab31d9982d07",
+///                                  exp.as_string());
+///                assert_eq!("3b334afb2dad9ebbcdd0654f01b1ba3d55c55442a6d9bcbcc26afeec5a395530",
+///                                  act.as_string());
+///                assert_eq!(t.x, 3);
+///            },
+///            // Don't expect an error in the log type.
+///            _ => panic!("Unexpected error during verification")
 ///        }
 ///    }
 /// }
 ///
 /// ```
-pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyError<T>>
+pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
         where L: Log<Item=T>, T: Hashable {
     let hashes: Vec<Hash> = LogIteratorHash::from_log(log).collect();
     for hash in hashes.iter().rev() {
-        let parent_hash_option = log.parent_hash(*hash);
+        let parent_hash_result = log.parent_hash(*hash);
         let entry = match log.get(*hash) {
-            None => return Some(gen_verify_error(None, *hash, Hash::None)),
-            Some(hash) => hash
+            Err(err) => return Some(LogVerifyFailure::LogError(err)),
+            Ok(hash) => hash
         };
         let entry_hash = entry.as_hash();
-        let expected_hash = match parent_hash_option {
-            None => entry_hash.as_hash(),
-            Some(parent_hash) => entry_hash.hash_with(parent_hash)
+        let expected_hash = match parent_hash_result {
+            Ok(parent_hash_option) => match parent_hash_option {
+                None => entry_hash.as_hash(),
+                Some(parent_hash) => entry_hash.hash_with(parent_hash)
+            },
+            Err(err) => return Some(LogVerifyFailure::LogError(err))
         };
 
         if *hash != expected_hash {
-            return Some(gen_verify_error(Some(entry), *hash, expected_hash));
+            return Some(gen_verify_failure(entry, *hash, expected_hash));
         }
     }
     None

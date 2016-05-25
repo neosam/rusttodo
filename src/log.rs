@@ -345,7 +345,7 @@ impl Hashable for Hash {
 
 // ---- DefaultLogEntry implementations ----
 /// Error type for the default log.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LogError {
     EntryNotFound(Hash)
 }
@@ -602,6 +602,7 @@ impl Writable for String {
 
 hashable_for_writable!(String);
 
+#[derive(PartialEq, Debug)]
 pub enum LogVerifyFailure<'a, T: 'a> {
     LogHashFailure {
         t: &'a T,
@@ -698,3 +699,58 @@ pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
     }
     None
 }
+
+
+/// Rebuild a log if the entries can be cloned
+///
+/// Rebuilding a log will create a new log of the same type and insert all
+/// entries again.  This can be used to fix wrong hashes caused by maniputation.
+///
+/// # Examples
+/// ```
+/// #[macro_use] extern crate tbd;
+/// use tbd::log::*;
+///
+/// #[derive(Debug, Clone, PartialEq)]
+/// struct A {x: u32}
+/// hashable_for_debug!(A);
+///
+/// fn main() {
+///     // Create a log with some dummy data
+///     let mut log = DefaultLog::<A>::new();
+///     log.push(A{x: 1});
+///     let hash = log.push(A{x: 2});
+///
+///     // Manipulate:
+///     // - Verification should fail
+///     // - Original hash should still be accessable
+///     match log.get_mut(hash) {
+///         Err(_) => panic!("Didn't expect that"),
+///         Ok(entry) => entry.x = 3
+///     }
+///     assert_eq!(true, verify_log(&log) != None);
+///     match log.get(hash) {
+///         Ok(_) => (),
+///         Err(_) => panic!("Expected to find an entry for the hash.")
+///     };
+///
+///     // Build new log with fixed hashes.
+///     // - Verification will succeed
+///     // - Original hash will not be in the log anymore
+///     let fixed_log = rebuild_log(&log).unwrap();
+///     assert_eq!(None, verify_log(&fixed_log));
+///     match fixed_log.get(hash) {
+///         Ok(_) => panic!("Expected not to find something with the hash"),
+///         Err(_) => ()
+///     }
+/// }
+/// ```
+pub fn rebuild_log<L: Log<Item=T>, T: Hashable + Clone>(log: &L) -> Result<L, LogError> {
+    let mut res = L::new();
+    let hashes: Vec<Hash> = LogIteratorHash::from_log(log).collect();
+    for hash in hashes.iter().rev() {
+        let entry = try!(log.get(*hash));
+        res.push(entry.clone());
+    }
+    Ok(res)
+} 

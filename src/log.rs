@@ -1,4 +1,37 @@
-//! Log entries chained by crypto hashes.
+//! Manipulation safe logging using crypo hashes.
+//!
+//! # Introduction
+//! ## Use case:  Bank account software
+//! Let's say you write an money account software where transfers between accounts
+//! should be logged and multiple users have access.  If you insert a transaction,
+//! you want a way to verify that nothing until the transaction was modified.
+//! This library gives you a hash for every transaction you insert and the data
+//! model makes sure you can quickly detect manipulations up to your transaction.
+//!
+//! ## More general:  Hashes as manipulation detection
+//! When inserting an entry to a log, a hash value is returned.  This value
+//! represents the inserted value and all it's previous entries.  Another way to
+//! express it would be: it stands for the value and all if its history.
+//! If any of it is maniputated,
+//!
+//! * the returned hash value would not match anymore or
+//! * one of the hash values is invalid
+//!
+//! ## How to change entries
+//! The library provides a way to modify entries.  For this, you can can borrow
+//! a mutable reference of the entry and modify it.  Doing this will break the
+//! verification check.  To fix the check again, a rebuild function is provided
+//! by the library which generates a new log with the entries.  The hashes
+//! for the entry and all newer entries will be completely different.  Through
+//! the hash values, the first modified entry will always be visible by others.
+//!
+//! Why are there ways to modify data then?  Well, first, thanks to pointers
+//! or structures like Call it will be possible anyway so there is no reason
+//! to provide a simple and safe way to do this.  Another reason is that
+//! modifications are only problematic if the entries are published or the
+//! hashes checked into some kind of tracking storage.  Local only data can
+//! be modified without causing any issues.
+//! 
 //!
 //! # Usage
 //! As the most abstract type, the main type is the Log trait in
@@ -133,6 +166,14 @@ pub trait Log {
     /// # Errors
     /// Throws an error if an entry of the hash was not found.
     fn get_mut(&mut self, hash: Hash) -> Result<&mut Self::Item, LogError>;
+
+    /// Verify if hash is in the log
+    fn has_hash(&self, hash: Hash) -> bool {
+        match self.parent_hash(hash) {
+            Ok(_) => true,
+            Err(_) => false
+        }
+    }
 }
 
 
@@ -718,31 +759,35 @@ pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
 /// fn main() {
 ///     // Create a log with some dummy data
 ///     let mut log = DefaultLog::<A>::new();
-///     log.push(A{x: 1});
-///     let hash = log.push(A{x: 2});
+///     let first_hash = log.push(A{x: 1});
+///     let second_hash = log.push(A{x: 2});
+///     let third_hash = log.push(A{x: 3});
 ///
-///     // Manipulate:
-///     // - Verification should fail
-///     // - Original hash should still be accessable
-///     match log.get_mut(hash) {
+///     // Manipulate the second hash:
+///     // - All hashes are still in the log
+///     // - Verification will fail since the entries do not match the hashes
+///     //     anymore
+///     match log.get_mut(second_hash) {
 ///         Err(_) => panic!("Didn't expect that"),
-///         Ok(entry) => entry.x = 3
+///         Ok(entry) => entry.x = 0
 ///     }
 ///     assert_eq!(true, verify_log(&log) != None);
-///     match log.get(hash) {
-///         Ok(_) => (),
-///         Err(_) => panic!("Expected to find an entry for the hash.")
-///     };
+///     assert_eq!(true, log.has_hash(first_hash)); 
+///     assert_eq!(true, log.has_hash(second_hash)); 
+///     assert_eq!(true, log.has_hash(third_hash)); 
 ///
 ///     // Build new log with fixed hashes.
+///     // - Only parts of the hashes will be found in the log
+///     //   - First one if found because maniputation took place after its entry
+///     //   - Second will not be found anymore because it the manipulated entry
+///     //   - Third entry also not be found because it comes after the maniputation
+///     //       and so it's already affected.
 ///     // - Verification will succeed
-///     // - Original hash will not be in the log anymore
 ///     let fixed_log = rebuild_log(&log).unwrap();
 ///     assert_eq!(None, verify_log(&fixed_log));
-///     match fixed_log.get(hash) {
-///         Ok(_) => panic!("Expected not to find something with the hash"),
-///         Err(_) => ()
-///     }
+///     assert_eq!(true, fixed_log.has_hash(first_hash)); 
+///     assert_eq!(false, fixed_log.has_hash(second_hash)); 
+///     assert_eq!(false, fixed_log.has_hash(third_hash)); 
 /// }
 /// ```
 pub fn rebuild_log<L: Log<Item=T>, T: Hashable + Clone>(log: &L) -> Result<L, LogError> {

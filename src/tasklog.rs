@@ -1,4 +1,4 @@
-//! Task and logging management
+//! Task management combined with manipulation save logging.
 
 extern crate crypto;
 extern crate byteorder;

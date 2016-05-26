@@ -5,7 +5,7 @@
 extern crate crypto;
 extern crate byteorder;
 
-use std::io::{Write};
+use std::io::{Read, Write};
 use self::crypto::sha3::Sha3;
 use self::crypto::digest::Digest;
 use self::byteorder::{BigEndian, ByteOrder};
@@ -231,3 +231,13 @@ impl Writable for String {
 }
 
 hashable_for_writable!(String);
+
+
+/// Read from a Read trait.
+pub trait Readable {
+    fn read_from(read: &mut Read) -> Self;
+}
+
+/// Type which can be written and loaded.
+pub trait ReadWrite: Read + Write {
+}

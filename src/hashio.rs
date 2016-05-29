@@ -9,6 +9,54 @@ use std::io::{Read, Write};
 use self::crypto::sha3::Sha3;
 use self::crypto::digest::Digest;
 use self::byteorder::{BigEndian, ByteOrder};
+use std::{io, error, fmt};
+use std::fs::{File, create_dir_all};
+use std::collections::BTreeMap;
+use std::time::SystemTime;
+
+
+#[derive(Debug)]
+pub enum HashIOError {
+    IOError(io::Error),
+    ParseError(Box<error::Error>)
+}
+
+impl fmt::Display for HashIOError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            HashIOError::IOError(ref err) => err.fmt(f),
+            HashIOError::ParseError(ref err) => write!(f, "Parse error: {}", err)
+        }
+    }
+}
+
+impl error::Error for HashIOError {
+    fn description(&self) -> &str {
+        match *self {
+            HashIOError::IOError(ref err) => err.description(),
+            HashIOError::ParseError(ref err) => err.description()
+        }
+    }
+}
+
+impl From<io::Error> for HashIOError {
+    fn from(err: io::Error) -> HashIOError {
+        HashIOError::IOError(err)
+    }
+}
+
+
+pub fn write_u32(i: u32, write: &mut Write) -> Result<usize, io::Error> {
+    let mut bytes = [0u8; 4];
+    BigEndian::write_u32(&mut bytes, i);
+    write.write(&bytes)
+}
+
+pub fn read_u32(read: &mut Read) -> Result<u32, io::Error> {
+    let mut bytes = [0u8; 4];
+    try!(read.read(&mut bytes));
+    Ok(BigEndian::read_u32(&bytes))
+}
 
 /// Stores one of the supported hash values.
 ///
@@ -116,10 +164,11 @@ impl Hashable for Hash {
 /// It also implements the Hashable type by default and generates
 /// a sha3 representation of its output.
 pub trait Writable {
-    fn write_to(&self, write: &mut Write);
-    fn writeable_to_hash(&self) -> Hash {
+    fn write_to(&self, write: &mut Write) -> Result<usize, io::Error>;
+    fn writable_to_hash(&self) -> Hash {
         let mut write: Vec<u8> = Vec::new();
-        self.write_to(&mut write);
+        self.write_to(&mut write)
+            .expect("Writing to a vec should not cause any issues");
         let data = write.as_slice();
         let mut hasher = Sha3::sha3_256();
         let mut hash_bytes = [0u8; 32];
@@ -142,15 +191,17 @@ pub trait Writable {
 ///
 /// use tbd::hashio::*;
 /// use std::io::Write;
+/// use std::io;
 ///
 /// struct A {
 ///    x: u8
 /// }
 ///
 /// impl Writable for A {
-///     fn write_to(&self, write: &mut Write) {
+///     fn write_to(&self, write: &mut Write) -> Result<usize, io::Error> {
 ///         let byte = [self.x];
-///         write.write(&byte);
+///         try!(write.write(&byte));
+///         Ok(1)
 ///     }
 /// }
 ///
@@ -169,7 +220,7 @@ macro_rules! hashable_for_writable {
     ($writable_type:path) => {
         impl Hashable for $writable_type {
             fn as_hash(&self) -> Hash {
-                self.writeable_to_hash()
+                self.writable_to_hash()
             }
         }
     }
@@ -221,23 +272,164 @@ fn usize_to_u32_bytes(x: usize) -> [u8; 4] {
     res
 }
 
-impl Writable for String {
-    fn write_to(&self, write: &mut Write) {
-        let str_bytes = self.as_bytes();
-        let len = usize_to_u32_bytes(str_bytes.len());
-        write.write(&len).expect("Could not write length of String");
-        write.write(&str_bytes).expect("Could not write String bytes");
-    }
-}
 
-hashable_for_writable!(String);
 
 
 /// Read from a Read trait.
 pub trait Readable {
-    fn read_from(read: &mut Read) -> Self;
+    fn read_from(read: &mut Read) -> Result<Self, HashIOError>
+        where Self: Sized;
 }
 
 /// Type which can be written and loaded.
-pub trait ReadWrite: Read + Write {
+pub trait ReadWrite: Readable + Writable {
+}
+
+
+
+/// Type which can be written and loaded and contain hashes as references to
+/// other objects.
+///
+/// The read and write function should not deeply save the whole data set.
+/// Instead it should store just store the hashes of any child objects which also
+/// implement the HashIO trait.
+///
+/// Save functions then can store each HashIO object in a separate file and so
+/// updates can be saved much faster and rendundance is avoided.
+pub trait HashIO<'a>: ReadWrite + Hashable {
+    fn childs(&self) -> &'a [Box<HashIO<'a>>];
+}
+
+impl Writable for String {
+    fn write_to(&self, write: &mut Write) -> Result<usize, io::Error> {
+        let str_bytes = self.as_bytes();
+        let len = usize_to_u32_bytes(str_bytes.len());
+        let mut size: usize = 0;
+        size += try!(write.write(&len));
+        size += try!(write.write(&str_bytes));
+        Ok(size)
+    }
+}
+impl ReadWrite for String {}
+impl<'a> HashIO<'a> for String {
+    fn childs(&self) -> &'a [Box<HashIO<'a>>] {
+        &[]
+    }
+}
+
+pub fn read_bytes(reader: &mut Read, n: usize) -> Result<Vec<u8>, io::Error> {
+    let mut buffer: [u8; 1] = [0; 1];
+    let mut res: Vec<u8> = Vec::with_capacity(n);
+    for _ in 0..n {
+        try!(reader.read(&mut buffer));
+        res.push(buffer[0]);
+    }
+    Ok(res)
+}
+
+impl Readable for String {
+    fn read_from(read: &mut Read) -> Result<String, HashIOError> {
+        let len = try!(read_u32(read));
+        let bytes = try!(read_bytes(read, len as usize));
+        let res = try!(String::from_utf8(bytes).map_err(|x| HashIOError::ParseError(Box::new(x))));
+        Ok(res)
+    }
+}
+hashable_for_writable!(String);
+
+/// Store a HashIO to HD and all its childs.
+pub fn save_hash_io(root_path: &str, version: u32,
+                    hash_io: &HashIO) -> Result<(), io::Error> {
+    // First make sure to save the childs
+    for child in hash_io.childs() {
+        try!(save_hash_io(root_path, version, &**child));
+    }
+
+    save_single_hash_io(root_path, version, hash_io)
+}
+
+pub fn save_single_hash_io(root_path: &str, version: u32, hash_io: &HashIO)
+                           -> Result<(), io::Error> {
+    let string_hash = hash_io.as_hash().as_string();
+    let dest_dir = format!("{}/{}", root_path.to_string(), string_hash[0..2].to_string());
+    let filename = format!("{}/{}/{}", root_path.to_string(), string_hash[0..2].to_string(),
+                           string_hash[2..].to_string());
+    try!(create_dir_all(dest_dir));
+    let mut f = try!(File::create(filename));
+    try!(f.write("TBDE".as_bytes()));
+    try!(write_u32(version, &mut f));
+    try!(hash_io.write_to(&mut f));
+    f.flush()
+}
+
+
+
+/// Hold cached data in this structure
+///
+/// ```
+/// #[macro_use] extern crate tbd;
+/// use tbd::hashio::*;
+/// use std::io::{Read, Write};
+/// use std::io;
+///
+/// struct A {x: u32}
+/// impl Writable for A {
+///     fn write_to(&self, write: &mut Write) -> Result<usize, io::Error> {
+///         write_u32(self.x, write)
+///     }
+/// }
+///
+/// impl Readable for A {
+///     fn read_from(read: &mut Read) -> Result<A, HashIOError> {
+///         Ok(A {x: try!(read_u32(read))})
+///     }
+/// }
+///
+/// fn main() {
+///
+/// }
+/// ```
+pub struct HashIOCache<'a> {
+    pub map: BTreeMap<Hash, HashIOCacheItem<'a>>
+}
+
+pub struct HashIOCacheItem<'a> {
+    pub saved_to_fs: bool,
+    pub last_usage: SystemTime,
+    pub item: *mut HashIO<'a>
+}
+
+impl<'a> HashIOCacheItem<'a> {
+    fn new<T: 'static + HashIO<'a>>(item: T) -> HashIOCacheItem<'a> {
+        HashIOCacheItem {
+            saved_to_fs: false,
+            last_usage: SystemTime::now(),
+            item: Box::into_raw(Box::new(item))
+        }
+    }
+}
+
+impl<'a> HashIOCache<'a> {
+    pub fn new() -> Self {
+        HashIOCache {
+            map: BTreeMap::new()
+        }
+    }
+
+    pub fn get<T: HashIO<'a>>(&self, hash: Hash) -> Option<Box<T>> {
+        match self.map.get(&hash) {
+            None => None,
+            Some(cache_item) => {
+                unsafe {
+                    Some(Box::from_raw(cache_item.item as *mut T))
+                }
+            }
+        }
+    }
+
+    pub fn put<T: 'static + HashIO<'a>>(&mut self, item: T) {
+        let hash = item.as_hash();
+        let item = HashIOCacheItem::new(item);
+        self.map.insert(hash, item);
+    }
 }

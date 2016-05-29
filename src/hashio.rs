@@ -13,6 +13,7 @@ use std::{io, error, fmt};
 use std::fs::{File, create_dir_all};
 use std::collections::BTreeMap;
 use std::time::SystemTime;
+use std::rc::Rc;
 
 
 #[derive(Debug)]
@@ -297,7 +298,7 @@ pub trait ReadWrite: Readable + Writable {
 /// Save functions then can store each HashIO object in a separate file and so
 /// updates can be saved much faster and rendundance is avoided.
 pub trait HashIO<'a>: ReadWrite + Hashable {
-    fn childs(&self) -> &'a [Box<HashIO<'a>>];
+    fn childs(&self) -> &'a [&HashIO<'a>];
 }
 
 impl Writable for String {
@@ -312,7 +313,7 @@ impl Writable for String {
 }
 impl ReadWrite for String {}
 impl<'a> HashIO<'a> for String {
-    fn childs(&self) -> &'a [Box<HashIO<'a>>] {
+    fn childs(&self) -> &'a [&HashIO<'a>] {
         &[]
     }
 }
@@ -338,8 +339,8 @@ impl Readable for String {
 hashable_for_writable!(String);
 
 /// Store a HashIO to HD and all its childs.
-pub fn save_hash_io(root_path: &str, version: u32,
-                    hash_io: &HashIO) -> Result<(), io::Error> {
+pub fn save_hash_io<'a>(root_path: &str, version: u32,
+                    hash_io: &'a HashIO<'a>) -> Result<(), io::Error> {
     // First make sure to save the childs
     for child in hash_io.childs() {
         try!(save_hash_io(root_path, version, &**child));
@@ -371,6 +372,7 @@ pub fn save_single_hash_io(root_path: &str, version: u32, hash_io: &HashIO)
 /// use tbd::hashio::*;
 /// use std::io::{Read, Write};
 /// use std::io;
+/// use std::rc::Rc;
 ///
 /// struct A {x: u32}
 /// impl Writable for A {
@@ -385,8 +387,29 @@ pub fn save_single_hash_io(root_path: &str, version: u32, hash_io: &HashIO)
 ///     }
 /// }
 ///
-/// fn main() {
+/// impl ReadWrite for A {}
 ///
+/// hashable_for_writable!(A);
+///
+/// impl<'a> HashIO<'a> for A {
+///     fn childs(&self) -> &'a [&HashIO<'a>] {
+///         &[]
+///     }
+/// }
+///
+/// fn main() {
+///     let mut cache = HashIOCache::new();
+///     let hash1 = cache.put(A{x: 0});
+///     let hash2 = cache.put(A{x: 1});
+///     let hash3 = cache.put(A{x: 2});
+///
+///     let a1: Rc<A> = cache.get(hash1).unwrap();
+///     let a2: Rc<A> = cache.get(hash2).unwrap();
+///     let a3: Rc<A> = cache.get(hash3).unwrap();
+///
+///     assert_eq!(0, a1.x);
+///     assert_eq!(1, a2.x);
+///     assert_eq!(2, a3.x);
 /// }
 /// ```
 pub struct HashIOCache<'a> {
@@ -416,20 +439,21 @@ impl<'a> HashIOCache<'a> {
         }
     }
 
-    pub fn get<T: HashIO<'a>>(&self, hash: Hash) -> Option<Box<T>> {
+    pub fn get<T: HashIO<'a>>(&self, hash: Hash) -> Option<Rc<T>> {
         match self.map.get(&hash) {
             None => None,
             Some(cache_item) => {
                 unsafe {
-                    Some(Box::from_raw(cache_item.item as *mut T))
+                    Some(Rc::new(*Box::from_raw(cache_item.item as *mut T)))
                 }
             }
         }
     }
 
-    pub fn put<T: 'static + HashIO<'a>>(&mut self, item: T) {
+    pub fn put<T: 'static + HashIO<'a>>(&mut self, item: T) -> Hash {
         let hash = item.as_hash();
         let item = HashIOCacheItem::new(item);
         self.map.insert(hash, item);
+        hash
     }
 }

@@ -1,6 +1,78 @@
 //! Cryptographic hashes including IO
 //!
-//! 
+//! # Usage
+//! This module provides functionality to let a struct
+//! represent itself as a cryptographic hash value.
+//! It also provides the Writable trait which can be used
+//! to save the struct.  Via a macro, a Hashable trait can
+//! be implemented if it implements the Writable trait.
+//!
+//! If a trait implements Writable, Readable and Hashable,
+//! it can also implement the HashIO trait which allows
+//! the values to be cashed.
+//!
+//! # Examples
+//! ```
+//! #[macro_use] extern crate tbd;
+//! use tbd::hashio::*;
+//! use std::io::{Read, Write};
+//! use std::io;
+//! use std::rc::Rc;
+//!
+//! // This is a simple struct we want to work with.
+//! struct A {x: u32}
+//!
+//! // Implement the Writable trait for our struct
+//! // so we can store it somewhere.
+//! impl Writable for A {
+//!     fn write_to(&self, write: &mut Write) -> Result<usize, io::Error> {
+//!         write_u32(self.x, write)
+//!     }
+//! }
+//!
+//! // Implement the Readablet trait for our struct
+//! // so we can read it again.
+//! impl Readable for A {
+//!     fn read_from(read: &mut Read) -> Result<A, HashIOError> {
+//!         Ok(A {x: try!(read_u32(read))})
+//!     }
+//! }
+//!
+//! // Define it as fully serializable.
+//! impl ReadWrite for A {}
+//!
+//! // Let a macro implement the hashing algorithm
+//! hashable_for_writable!(A);
+//!
+//! // Make a full HashIO out of it
+//! impl HashIO for A {
+//!     // Return the childs
+//!     fn childs(&self) -> Vec<&HashIO> {
+//!         Vec::new()
+//!     }
+//! }
+//!
+//! fn main() {
+//!     // Create and initialize the cashe and store some structs.
+//!     // The insert function returns a hash value which is used to
+//!     // access the values.
+//!     let mut cache = HashIOCache::new();
+//!     let hash1 = cache.put(A{x: 0});
+//!     let hash2 = cache.put(A{x: 1});
+//!     let hash3 = cache.put(A{x: 2});
+//!
+//!     // Lets return these values again.
+//!     let a1: Rc<A> = cache.get(hash1).unwrap();
+//!     let a2: Rc<A> = cache.get(hash2).unwrap();
+//!     let a3: Rc<A> = cache.get(hash3).unwrap();
+//!
+//!     // Verify if we actually got the right values.
+//!     assert_eq!(0, a1.x);
+//!     assert_eq!(1, a2.x);
+//!     assert_eq!(2, a3.x);
+//! }
+//! ```
+
 
 extern crate crypto;
 extern crate byteorder;
@@ -297,8 +369,8 @@ pub trait ReadWrite: Readable + Writable {
 ///
 /// Save functions then can store each HashIO object in a separate file and so
 /// updates can be saved much faster and rendundance is avoided.
-pub trait HashIO<'a>: ReadWrite + Hashable {
-    fn childs(&self) -> &'a [&HashIO<'a>];
+pub trait HashIO: ReadWrite + Hashable {
+    fn childs(&self) -> Vec<&HashIO>;
 }
 
 impl Writable for String {
@@ -312,9 +384,9 @@ impl Writable for String {
     }
 }
 impl ReadWrite for String {}
-impl<'a> HashIO<'a> for String {
-    fn childs(&self) -> &'a [&HashIO<'a>] {
-        &[]
+impl HashIO for String {
+    fn childs(&self) -> Vec<&HashIO> {
+        Vec::new()
     }
 }
 
@@ -339,11 +411,11 @@ impl Readable for String {
 hashable_for_writable!(String);
 
 /// Store a HashIO to HD and all its childs.
-pub fn save_hash_io<'a>(root_path: &str, version: u32,
-                    hash_io: &'a HashIO<'a>) -> Result<(), io::Error> {
+pub fn save_hash_io(root_path: &str, version: u32,
+                    hash_io: &HashIO) -> Result<(), io::Error> {
     // First make sure to save the childs
     for child in hash_io.childs() {
-        try!(save_hash_io(root_path, version, &**child));
+        try!(save_hash_io(root_path, version, &*child));
     }
 
     save_single_hash_io(root_path, version, hash_io)
@@ -391,9 +463,9 @@ pub fn save_single_hash_io(root_path: &str, version: u32, hash_io: &HashIO)
 ///
 /// hashable_for_writable!(A);
 ///
-/// impl<'a> HashIO<'a> for A {
-///     fn childs(&self) -> &'a [&HashIO<'a>] {
-///         &[]
+/// impl HashIO for A {
+///     fn childs(&self) -> Vec<&HashIO> {
+///         Vec::new()
 ///     }
 /// }
 ///
@@ -412,18 +484,18 @@ pub fn save_single_hash_io(root_path: &str, version: u32, hash_io: &HashIO)
 ///     assert_eq!(2, a3.x);
 /// }
 /// ```
-pub struct HashIOCache<'a> {
-    pub map: BTreeMap<Hash, HashIOCacheItem<'a>>
+pub struct HashIOCache {
+    pub map: BTreeMap<Hash, HashIOCacheItem>
 }
 
-pub struct HashIOCacheItem<'a> {
+pub struct HashIOCacheItem {
     pub saved_to_fs: bool,
     pub last_usage: SystemTime,
-    pub item: *mut HashIO<'a>
+    pub item: *mut HashIO
 }
 
-impl<'a> HashIOCacheItem<'a> {
-    fn new<T: 'static + HashIO<'a>>(item: T) -> HashIOCacheItem<'a> {
+impl HashIOCacheItem {
+    fn new<T: 'static + HashIO>(item: T) -> HashIOCacheItem {
         HashIOCacheItem {
             saved_to_fs: false,
             last_usage: SystemTime::now(),
@@ -432,14 +504,14 @@ impl<'a> HashIOCacheItem<'a> {
     }
 }
 
-impl<'a> HashIOCache<'a> {
+impl<'a> HashIOCache {
     pub fn new() -> Self {
         HashIOCache {
             map: BTreeMap::new()
         }
     }
 
-    pub fn get<T: HashIO<'a>>(&self, hash: Hash) -> Option<Rc<T>> {
+    pub fn get<T: HashIO>(&self, hash: Hash) -> Option<Rc<T>> {
         match self.map.get(&hash) {
             None => None,
             Some(cache_item) => {
@@ -450,7 +522,7 @@ impl<'a> HashIOCache<'a> {
         }
     }
 
-    pub fn put<T: 'static + HashIO<'a>>(&mut self, item: T) -> Hash {
+    pub fn put<T: 'static + HashIO>(&mut self, item: T) -> Hash {
         let hash = item.as_hash();
         let item = HashIOCacheItem::new(item);
         self.map.insert(hash, item);

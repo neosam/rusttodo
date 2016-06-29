@@ -33,7 +33,7 @@
 //! // Implement the Readablet trait for our struct
 //! // so we can read it again.
 //! impl Readable for A {
-//!     fn read_from(read: &mut Read) -> Result<A, HashIOError> {
+//!     fn read_from(read: &mut Read, _: &mut HashIOCache) -> Result<A, HashIOError> {
 //!         Ok(A {x: try!(read_u32(read))})
 //!     }
 //! }
@@ -350,7 +350,7 @@ fn usize_to_u32_bytes(x: usize) -> [u8; 4] {
 
 /// Read from a Read trait.
 pub trait Readable {
-    fn read_from(read: &mut Read) -> Result<Self, HashIOError>
+    fn read_from(read: &mut Read, cache: &mut HashIOCache) -> Result<Self, HashIOError>
         where Self: Sized;
 }
 
@@ -401,7 +401,7 @@ pub fn read_bytes(reader: &mut Read, n: usize) -> Result<Vec<u8>, io::Error> {
 }
 
 impl Readable for String {
-    fn read_from(read: &mut Read) -> Result<String, HashIOError> {
+    fn read_from(read: &mut Read, _: &mut HashIOCache) -> Result<String, HashIOError> {
         let len = try!(read_u32(read));
         let bytes = try!(read_bytes(read, len as usize));
         let res = try!(String::from_utf8(bytes).map_err(|x| HashIOError::ParseError(Box::new(x))));
@@ -454,7 +454,7 @@ pub fn save_single_hash_io(root_path: &str, version: u32, hash_io: &HashIO)
 /// }
 ///
 /// impl Readable for A {
-///     fn read_from(read: &mut Read) -> Result<A, HashIOError> {
+///     fn read_from(read: &mut Read, _: &mut HashIOCache) -> Result<A, HashIOError> {
 ///         Ok(A {x: try!(read_u32(read))})
 ///     }
 /// }

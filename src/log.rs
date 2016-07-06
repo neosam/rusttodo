@@ -52,7 +52,7 @@
 //! // Load helpful macros by adding the macro_use tag.
 //! #[macro_use] extern crate tbd;
 //!
-//! use tbd::hashio::*;
+//! use tbd::hash::*;
 //! use tbd::log::*;
 //!
 //! // Defining the type we want to store.  Lets use a simple struct which
@@ -120,7 +120,7 @@
 
 extern crate time;
 
-use hashio::*;
+use hash::*;
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fmt;
@@ -228,7 +228,7 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorRef<'a, L, T>
 /// Iterator which iterates over the hashes of a log.
 ///
 /// ```
-/// use tbd::hashio::*;
+/// use tbd::hash::*;
 /// use tbd::log::*;
 /// let mut log = DefaultLog::<String>::new();
 ///
@@ -444,7 +444,7 @@ fn gen_verify_failure<'a, T>(t: &'a T, act: Hash, exp: Hash)
 /// # Examples
 /// ```
 /// #[macro_use] extern crate tbd;
-/// use tbd::hashio::*;
+/// use tbd::hash::*;
 /// use tbd::log::*;
 ///
 /// #[derive(Debug)] struct A {x: u32}
@@ -527,7 +527,7 @@ pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
 /// # Examples
 /// ```
 /// #[macro_use] extern crate tbd;
-/// use tbd::hashio::*;
+/// use tbd::hash::*;
 /// use tbd::log::*;
 ///
 /// #[derive(Debug, Clone, PartialEq)]

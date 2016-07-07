@@ -174,7 +174,7 @@ macro_rules! tbd_model {
         hashable_for_writable!($model_name);
 
         impl HashIOImpl<$model_name> for HashIO {
-            fn receive_hashable<R>(&self, read: &mut R) -> Result<A, HashIOError>
+            fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError>
                     where R: Read {
                 $( let $attr_name = try!($imp_fn(read)); )* ;
                 $(
@@ -184,18 +184,18 @@ macro_rules! tbd_model {
                         $hash_name = try!(self.get(&hash_val));
                     }
                 )*
-                Ok(A{
+                Ok($model_name{
                     $($attr_name: $attr_name,)*
                     $($hash_name: $hash_name),*
                     })
             }
 
-            fn store_childs(&self, hashable: &A) -> Result<(), HashIOError> {
+            fn store_childs(&self, hashable: &$model_name) -> Result<(), HashIOError> {
                 $( try!(self.put(&hashable.$hash_name)); )*
                 Ok(())
             }
 
-            fn store_hashable<W>(&self, hashable: &A, write: &mut W) -> Result<(), HashIOError>
+            fn store_hashable<W>(&self, hashable: &$model_name, write: &mut W) -> Result<(), HashIOError>
                     where W: Write {
                 try!(hashable.write_to(write));
                 Ok(())
@@ -211,9 +211,6 @@ tbd_model!(A, [
     ]);
 
 
-/*!
-    Testing without macros.  Everything is hand-crafted.
-*/
 #[cfg(test)]
 mod test {
     use super::super::hash::*;
@@ -270,9 +267,7 @@ mod test {
 }
 
 
-/*!
-    Testing with macros.
-*/
+
 #[cfg(test)]
 mod test2 {
     use super::super::hash::*;
@@ -287,21 +282,35 @@ mod test2 {
         [b: String]
      ]);
 
+    tbd_model!(B, [  ]
+        , [
+            [foo: String],
+            [bar: A],
+            [foobar: A]
+        ]
+    );
+
     #[test]
     fn simple_test() {
         let hash_io = HashIO::new("savetest".to_string());
-        let a_hash;
-        {
-            let a = A {
+        let my_hash;
+        let b = B {
+            foo: "Foo".to_string(),
+            bar: A {
                 a: 20,
                 b: "Foo".to_string()
-            };
-            a_hash = a.as_hash();
-            hash_io.put(&a).unwrap();
-        }
+            },
+            foobar: A {
+                a: 30,
+                b: "baz".to_string()
+            }
+        };
+        my_hash = b.as_hash();
+        hash_io.put(&b).unwrap();
 
-        let a2: A = hash_io.get(&a_hash).unwrap();
-        assert_eq!(20, a2.a);
-        assert_eq!("Foo".to_string(), a2.b);
+        let b_read: B = hash_io.get(&my_hash).unwrap();
+        assert_eq!(b, b_read);
+        assert_eq!(b.foo, b_read.foo);
+        assert_eq!(b.foobar, b_read.foobar);
     }
 }

@@ -126,16 +126,9 @@ impl<T> Log for IOLog<T>
     ///
     /// # Errors
     /// Throws an error if an entry of the hash was not found.
-    fn get(&self, _: Hash) -> Result<&Self::Item, LogError> {
-        Err(LogError::EntryNotFound(Hash::None))
-    }
-
-    /// Get a mutable entry of the given hash
-    ///
-    /// # Errors
-    /// Throws an error if an entry of the hash was not found.
-    fn get_mut(&mut self, _: Hash) -> Result<&mut Self::Item, LogError> {
-        Err(LogError::EntryNotFound(Hash::None))
+    fn get(&self, hash: Hash) -> Result<Self::Item, LogError> {
+        let item: IOLogItem<T> = try!(self.hashio.get::<IOLogItem<T>>(&hash));
+        Ok(item.item)
     }
 }
 

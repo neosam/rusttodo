@@ -45,77 +45,6 @@
 //! Hashable trait must be implemented for the types.  It's also
 //! possible to implement the Writable trait which provides a
 //! a helper function to calculate the hash.
-//!
-//! # Examples
-//!
-//! ```
-//! // Load helpful macros by adding the macro_use tag.
-//! #[macro_use] extern crate tbd;
-//!
-//! use tbd::hash::*;
-//! use tbd::log::*;
-//!
-//! // Defining the type we want to store.  Lets use a simple struct which
-//! // stores a byte for this example.
-//! #[derive(Debug)]
-//! struct MyStruct {
-//!    x: u8
-//! }
-//!
-//! // Make the struct Hashable.  Then it can be used for the Log types.
-//! hashable_for_debug!(MyStruct);
-//!
-//!
-//! fn main() {
-//!     // Create new log object.  DefaultLog is the standard implementation
-//!     // which also provides support to store and load entries and for iterators.
-//!     let mut log: DefaultLog<MyStruct> = DefaultLog::default();
-//!
-//!     // Add some entries
-//!     let first_hash: Hash = log.push(MyStruct{x: 42});
-//!     let second_hash: Hash = log.push(MyStruct{x: 23});
-//!
-//!     // The push method returns the hash value which can be used as key.
-//!     assert_eq!("5c9fd46aeb2781bb9ec9e5263cca012a4ea4632f2ac99991c8f430e2d051d268",
-//!                    &first_hash.as_string());
-//!     assert_eq!("a63ffbc7a358a3556a84531c55647ec9aeb4ca6e0a78edba86511c48c4bca1bd",
-//!                    &second_hash.as_string());
-//!
-//!     // Inserting the same value again gives a completely different hash because
-//!     // the hash also contains the previous entry.
-//!     let third_hash: Hash = log.push(MyStruct{x: 23});
-//!     assert_eq!("5fb3153625b7e41f791f81f4df593f15f8810034322e85916961578d0fbec635",
-//!                    &third_hash.as_string());
-//!
-//!     // With get, we can borrow the entries using the hashes received from the
-//!     // push method.
-//!     assert_eq!(42, log.get(first_hash).unwrap().x);
-//!     assert_eq!(23, log.get(second_hash).unwrap().x);
-//!     assert_eq!(23, log.get(third_hash).unwrap().x);
-//!
-//!     // Iterate over the entries
-//!     // This log operates like a stack and will return the last (latest)
-//!     // entry first.
-//!     let mut res = Vec::<u8>::new();
-//!     for item in log.iter() {
-//!         res.push(item.x);
-//!     }
-//!
-//!     assert_eq!(23, res[0]);
-//!     assert_eq!(23, res[1]);
-//!     assert_eq!(42, res[2]);
-//!
-//!     // We can also iterate over the hashes.  Lets collect all in a Vec.
-//!     let mut hashes: Vec<Hash> = log.hash_iter().collect();
-//!     assert_eq!(3, hashes.len());
-//!     assert_eq!("5fb3153625b7e41f791f81f4df593f15f8810034322e85916961578d0fbec635",
-//!                    &hashes[0].as_string());
-//!     assert_eq!("a63ffbc7a358a3556a84531c55647ec9aeb4ca6e0a78edba86511c48c4bca1bd",
-//!                    &hashes[1].as_string());
-//!     assert_eq!("5c9fd46aeb2781bb9ec9e5263cca012a4ea4632f2ac99991c8f430e2d051d268",
-//!                    &hashes[2].as_string());
-//! }
-//! ```
 
 
 extern crate time;
@@ -152,13 +81,7 @@ pub trait Log {
     ///
     /// # Errors
     /// Throws an error if an entry of the hash was not found.
-    fn get(&self, hash: Hash) -> Result<&Self::Item, LogError>;
-
-    /// Get a mutable entry of the given hash
-    ///
-    /// # Errors
-    /// Throws an error if an entry of the hash was not found.
-    fn get_mut(&mut self, hash: Hash) -> Result<&mut Self::Item, LogError>;
+    fn get(&self, hash: Hash) -> Result<Self::Item, LogError>;
 
     /// Verify if hash is in the log
     fn has_hash(&self, hash: Hash) -> bool {
@@ -207,9 +130,9 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> LogIteratorRef<'a, L, T> {
 }
 
 impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorRef<'a, L, T> {
-    type Item = &'a T;
+    type Item = T;
 
-    fn next(&mut self) -> Option<&'a T> {
+    fn next(&mut self) -> Option<T> {
         match self.hash {
             None => None,
             Some(hash) => {
@@ -308,7 +231,7 @@ impl Error for LogError {
 
 
 /// Type for each entry of the DefaultLog.
-pub struct DefaultLogEntry<T: Hashable> {
+pub struct DefaultLogEntry<T: Hashable + Clone> {
     /// Holds the actial entry.
     pub entry: T,
 
@@ -320,14 +243,14 @@ pub struct DefaultLogEntry<T: Hashable> {
 ///
 /// It already provides functions to generate iterators for its entries and
 /// hashes.
-pub struct DefaultLog<T: Hashable> {
+pub struct DefaultLog<T: Hashable + Clone> {
     entries: BTreeMap<Hash, DefaultLogEntry<T>>,
     head: Option<Hash>,
     load: Box<Fn(Hash) -> Option<DefaultLogEntry<T>>>,
     save: Box<Fn(&DefaultLogEntry<T>)>
 }
 
-impl<T: Hashable> DefaultLog<T> {
+impl<T: Hashable + Clone> DefaultLog<T> {
     /// Get the iterator for the entries.
     pub fn iter(&self) -> LogIteratorRef<DefaultLog<T>, T> {
         LogIteratorRef::from_log(self)
@@ -353,7 +276,7 @@ impl<T: Hashable> DefaultLog<T> {
     }
 }
 
-impl<T: Hashable> Log for DefaultLog<T> {
+impl<T: Hashable + Clone> Log for DefaultLog<T> {
     type Item = T;
 
 
@@ -393,22 +316,15 @@ impl<T: Hashable> Log for DefaultLog<T> {
     }
 
     /// Get entry with 
-    fn get(&self, hash: Hash) -> Result<&Self::Item, LogError> {
+    fn get(&self, hash: Hash) -> Result<Self::Item, LogError> {
         match self.entries.get(&hash) {
             None => Result::Err(LogError::EntryNotFound(hash)),
-            Some(ref entry) => Ok(&entry.entry)
-        }
-    }
-
-    fn get_mut(&mut self, hash: Hash) -> Result<&mut Self::Item, LogError> {
-        match self.entries.get_mut(&hash) {
-            None => Result::Err(LogError::EntryNotFound(hash)),
-            Some(entry) => Ok(&mut entry.entry)
+            Some(ref entry) => Ok(entry.entry.clone())
         }
     }
 }
 
-impl<T: Hashable> Default for DefaultLog<T> {
+impl<T: Hashable + Clone> Default for DefaultLog<T> {
     fn default() -> Self {
         DefaultLog {
             entries: BTreeMap::new(),
@@ -422,17 +338,17 @@ impl<T: Hashable> Default for DefaultLog<T> {
 
 
 #[derive(PartialEq, Debug)]
-pub enum LogVerifyFailure<'a, T: 'a> {
+pub enum LogVerifyFailure<T> {
     LogHashFailure {
-        t: &'a T,
+        t: T,
         actual_hash: Hash,
         expected_hash: Hash
     },
     LogError(LogError)
 }
 
-fn gen_verify_failure<'a, T>(t: &'a T, act: Hash, exp: Hash)
-                           -> LogVerifyFailure<'a, T> {
+fn gen_verify_failure<T>(t: T, act: Hash, exp: Hash)
+                           -> LogVerifyFailure<T> {
     LogVerifyFailure::LogHashFailure {
         t: t,
         actual_hash: act,
@@ -443,58 +359,6 @@ fn gen_verify_failure<'a, T>(t: &'a T, act: Hash, exp: Hash)
 
 /// Verifies if the hash values of all entries are correct.
 ///
-/// # Examples
-/// ```
-/// #[macro_use] extern crate tbd;
-/// use tbd::hash::*;
-/// use tbd::log::*;
-///
-/// #[derive(Debug)] struct A {x: u32}
-/// hashable_for_debug!(A);
-///
-/// fn main() {
-///    let mut log = DefaultLog::<A>::default();
-///    log.push(A{x: 1});
-///    let entry_hash = log.push(A{x: 2});
-///
-///    // Expect the hashes in the logs are correct since no entries were
-///    // modified.
-///    match verify_log(&log) {
-///        // None means, no errors found
-///        None => (),
-///        // Some means that something is not correct.
-///        Some(_) => panic!("Expected no error if nothing was maniputated")
-///    }
-///
-///    // Now lets manipulate some data
-///    match log.get_mut(entry_hash) {
-///        Err(_) => panic!("Expected an entry here, gave valid hash"),
-///        Ok(entry) => entry.x = 3
-///    }
-///
-///    // Verify again and it should find maniputation in the data.
-///    match verify_log(&log) {
-///        // None would mean that still everything is ok.
-///        None => panic!("This time, verification should fail"),
-///        // Some means an issue is was found.
-///        // This can either be an error while accessing the log entries
-///        // or a LogHashFailure which indicates maniputation. 
-///        Some(fail) => match fail {
-///            // Expecting maniputation and so a LogHashFailure.
-///            LogVerifyFailure::LogHashFailure{t: t, expected_hash: exp, actual_hash: act} => {
-///                assert_eq!("8da97bd9319b3eddb72c4f1e4b455090f69ee415dedde4e08e45ab31d9982d07",
-///                                  exp.as_string());
-///                assert_eq!("3b334afb2dad9ebbcdd0654f01b1ba3d55c55442a6d9bcbcc26afeec5a395530",
-///                                  act.as_string());
-///                assert_eq!(t.x, 3);
-///            },
-///            // Don't expect an error in the log type.
-///            _ => panic!("Unexpected error during verification")
-///        }
-///    }
-/// }
-///
-/// ```
 pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
         where L: Log<Item=T>, T: Hashable {
     let hashes: Vec<Hash> = LogIteratorHash::from_log(log).collect();
@@ -525,51 +389,7 @@ pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
 ///
 /// Rebuilding a log will create a new log of the same type and insert all
 /// entries again.  This can be used to fix wrong hashes caused by maniputation.
-///
-/// # Examples
-/// ```
-/// #[macro_use] extern crate tbd;
-/// use tbd::hash::*;
-/// use tbd::log::*;
-///
-/// #[derive(Debug, Clone, PartialEq)]
-/// struct A {x: u32}
-/// hashable_for_debug!(A);
-///
-/// fn main() {
-///     // Create a log with some dummy data
-///     let mut log = DefaultLog::<A>::default();
-///     let first_hash = log.push(A{x: 1});
-///     let second_hash = log.push(A{x: 2});
-///     let third_hash = log.push(A{x: 3});
-///
-///     // Manipulate the second hash:
-///     // - All hashes are still in the log
-///     // - Verification will fail since the entries do not match the hashes
-///     //     anymore
-///     match log.get_mut(second_hash) {
-///         Err(_) => panic!("Didn't expect that"),
-///         Ok(entry) => entry.x = 0
-///     }
-///     assert_eq!(true, verify_log(&log) != None);
-///     assert_eq!(true, log.has_hash(first_hash)); 
-///     assert_eq!(true, log.has_hash(second_hash)); 
-///     assert_eq!(true, log.has_hash(third_hash)); 
-///
-///     // Build new log with fixed hashes.
-///     // - Only parts of the hashes will be found in the log
-///     //   - First one if found because maniputation took place after its entry
-///     //   - Second will not be found anymore because it the manipulated entry
-///     //   - Third entry also not be found because it comes after the maniputation
-///     //       and so it's already affected.
-///     // - Verification will succeed
-///     let fixed_log = rebuild_log(&log).unwrap();
-///     assert_eq!(None, verify_log(&fixed_log));
-///     assert_eq!(true, fixed_log.has_hash(first_hash)); 
-///     assert_eq!(false, fixed_log.has_hash(second_hash)); 
-///     assert_eq!(false, fixed_log.has_hash(third_hash)); 
-/// }
-/// ```
+
 pub fn rebuild_log<L, T>(log: &L) -> Result<L, LogError>
                 where L: Log<Item=T> + Default,
                       T: Hashable + Clone {

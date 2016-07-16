@@ -90,7 +90,10 @@ impl<T> Log for IOLog<T>
 
     /// Head hash
     fn head_hash(&self) -> Option<Hash> {
-        None
+        match &self.head {
+            &Option::None => Option::None,
+            &Option::Some(ref item) => Some(item.as_hash())
+        }
     }
 
     /// Get the parent hash of the given hash.

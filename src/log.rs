@@ -283,14 +283,16 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorHash<'a, L, T
 /// Error type for the default log.
 #[derive(Debug, PartialEq)]
 pub enum LogError {
-    EntryNotFound(Hash)
+    EntryNotFound(Hash),
+    Unknown
 }
 
 impl fmt::Display for LogError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             LogError::EntryNotFound(hash) => write!(f, "Entry not found for hash: {}",
-                                          hash.as_string())
+                                          hash.as_string()),
+            LogError::Unknown => write!(f, "Unknown log error")
         }
     }
 }
@@ -298,7 +300,8 @@ impl fmt::Display for LogError {
 impl Error for LogError {
     fn description(&self) -> &str {
         match *self {
-            LogError::EntryNotFound(_) => "Entry for hash not found"
+            LogError::EntryNotFound(_) => "Entry for hash not found",
+            LogError::Unknown => "Unknown log error"
         }
     }
 }

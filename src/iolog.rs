@@ -5,6 +5,12 @@ use log::*;
 use std::io;
 use std::io::{Write, Read};
 
+impl From<HashIOError> for LogError {
+    fn from(_: HashIOError) -> LogError {
+        LogError::Unknown
+    }
+}
+
 pub struct IOLogItem<T>
         where T: Hashable,
               HashIO: HashIOImpl<T> {
@@ -108,8 +114,12 @@ impl<T> Log for IOLog<T>
     ///
     /// # Errors
     /// Throws an error if an entry of the hash was not found.
-    fn parent_hash(&self, _: Hash) -> Result<Option<Hash>, LogError> {
-        Ok(Option::None)
+    fn parent_hash(&self, hash: Hash) -> Result<Option<Hash>, LogError> {
+        let item: IOLogItem<T> = try!(self.hashio.get::<IOLogItem<T>>(&hash));
+        Ok(match item.parent_hash {
+            Hash::None => Option::None,
+            _ => Option::Some(hash)
+        })
     }
 
     /// Get the borrowed entry of the given hash

@@ -63,7 +63,8 @@ impl<T> HashIOImpl<IOLogItem<T>> for HashIO
 pub struct IOLog<T>
         where T: Hashable,
               HashIO: HashIOImpl<T> {
-    pub head: Option<IOLogItem<T>>
+    pub head: Option<IOLogItem<T>>,
+    pub hashio: HashIO
 }
 
 
@@ -74,14 +75,18 @@ impl<T> Log for IOLog<T>
     type Item = T;
 
     /// Add new entry to the log
-    fn push(&mut self, hashio: T) -> Hash {
-        let hash = hashio.as_hash();
+    fn push(&mut self, hashable: T) -> Hash {
+        match self.hashio.put(&hashable) {
+            Ok(_) => (),
+            Err(_) => ()
+        }
+        let hash = hashable.as_hash();
         let new_head = IOLogItem {
             parent_hash: match &self.head {
                 &Option::None => Hash::None,
                 &Option::Some(ref parent_item) => parent_item.as_hash()
             },
-            item: hashio
+            item: hashable
         };
         self.head = Some(new_head);
         hash

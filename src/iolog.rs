@@ -68,14 +68,23 @@ pub struct IOLog<T>
 
 
 
-impl<T> Log for IOLogItem<T>
+impl<T> Log for IOLog<T>
         where T: Hashable,
               HashIO: HashIOImpl<T> {
     type Item = T;
 
     /// Add new entry to the log
-    fn push(&mut self, _: T) -> Hash {
-        Hash::None
+    fn push(&mut self, hashio: T) -> Hash {
+        let hash = hashio.as_hash();
+        let new_head = IOLogItem {
+            parent_hash: match &self.head {
+                &Option::None => Hash::None,
+                &Option::Some(ref parent_item) => parent_item.as_hash()
+            },
+            item: hashio
+        };
+        self.head = Some(new_head);
+        hash
     }
 
 
@@ -111,3 +120,4 @@ impl<T> Log for IOLogItem<T>
         Err(LogError::EntryNotFound(Hash::None))
     }
 }
+

@@ -69,7 +69,7 @@
 //! fn main() {
 //!     // Create new log object.  DefaultLog is the standard implementation
 //!     // which also provides support to store and load entries and for iterators.
-//!     let mut log: DefaultLog<MyStruct> = DefaultLog::new();
+//!     let mut log: DefaultLog<MyStruct> = DefaultLog::default();
 //!
 //!     // Add some entries
 //!     let first_hash: Hash = log.push(MyStruct{x: 42});
@@ -132,9 +132,6 @@ use std::fmt;
 pub trait Log {
     type Item: Hashable;
 
-    /// Create an empty log
-    fn new() -> Self;
-
     /// Add new entry to the log
     fn push(&mut self, Self::Item) -> Hash;
 
@@ -179,13 +176,13 @@ pub trait Log {
 /// ```
 /// use tbd::log::*;
 /// use tbd::hashio::*;
-/// let mut log = DefaultLog::<String>::new();
+/// let mut log = DefaultLog::<String>::default();
 ///
 /// log.push("str1".to_string());
 /// log.push("str2".to_string());
 ///
 /// let mut log_iter = LogIteratorRef::from_log(&log);
-/// let mut res: Vec<String> = Vec::new();
+/// let mut res: Vec<String> = Vec::default();
 /// for my_str in log_iter {
 ///     res.push(my_str.clone());
 /// }
@@ -230,7 +227,7 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorRef<'a, L, T>
 /// ```
 /// use tbd::hash::*;
 /// use tbd::log::*;
-/// let mut log = DefaultLog::<String>::new();
+/// let mut log = DefaultLog::<String>::default();
 ///
 /// log.push("str1".to_string());
 /// log.push("str2".to_string());
@@ -356,15 +353,6 @@ impl<T: Hashable> DefaultLog<T> {
 impl<T: Hashable> Log for DefaultLog<T> {
     type Item = T;
 
-    /// Create empty log.
-    fn new() -> Self {
-        DefaultLog {
-            entries: BTreeMap::new(),
-            head: None,
-            load: Box::new(|_| None),
-            save: Box::new(|_| ())
-        }
-    }
 
     /// Add new entry to log.
     ///
@@ -417,6 +405,17 @@ impl<T: Hashable> Log for DefaultLog<T> {
     }
 }
 
+impl<T: Hashable> Default for DefaultLog<T> {
+    fn default() -> Self {
+        DefaultLog {
+            entries: BTreeMap::new(),
+            head: None,
+            load: Box::new(|_| None),
+            save: Box::new(|_| ())
+        }
+    }
+}
+
 
 
 #[derive(PartialEq, Debug)]
@@ -451,7 +450,7 @@ fn gen_verify_failure<'a, T>(t: &'a T, act: Hash, exp: Hash)
 /// hashable_for_debug!(A);
 ///
 /// fn main() {
-///    let mut log = DefaultLog::<A>::new();
+///    let mut log = DefaultLog::<A>::default();
 ///    log.push(A{x: 1});
 ///    let entry_hash = log.push(A{x: 2});
 ///
@@ -536,7 +535,7 @@ pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
 ///
 /// fn main() {
 ///     // Create a log with some dummy data
-///     let mut log = DefaultLog::<A>::new();
+///     let mut log = DefaultLog::<A>::default();
 ///     let first_hash = log.push(A{x: 1});
 ///     let second_hash = log.push(A{x: 2});
 ///     let third_hash = log.push(A{x: 3});
@@ -568,12 +567,14 @@ pub fn verify_log<L, T>(log: &L) -> Option<LogVerifyFailure<T>>
 ///     assert_eq!(false, fixed_log.has_hash(third_hash)); 
 /// }
 /// ```
-pub fn rebuild_log<L: Log<Item=T>, T: Hashable + Clone>(log: &L) -> Result<L, LogError> {
-    let mut res = L::new();
+pub fn rebuild_log<L, T>(log: &L) -> Result<L, LogError>
+                where L: Log<Item=T> + Default,
+                      T: Hashable + Clone {
+    let mut res: L = Default::default();
     let hashes: Vec<Hash> = LogIteratorHash::from_log(log).collect();
     for hash in hashes.iter().rev() {
         let entry = try!(log.get(*hash));
         res.push(entry.clone());
     }
     Ok(res)
-} 
+}

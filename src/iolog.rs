@@ -1,0 +1,113 @@
+use hash::*;
+use hashio::*;
+use io::*;
+use log::*;
+use std::io;
+use std::io::{Write, Read};
+
+pub struct IOLogItem<T>
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    parent_hash: Hash,
+    item: T
+}
+
+impl<T> Writable for IOLogItem<T>
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
+        let mut size = 0;
+        size += try!(write_hash(&self.parent_hash, write));
+        try!(write_hash(&self.item.as_hash(), write));
+        size += 32;
+        Ok(size)
+    }
+}
+impl<T> Hashable for IOLogItem<T>
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    fn as_hash(&self) -> Hash {
+        self.writable_to_hash()
+    }
+}
+
+impl<T> HashIOImpl<IOLogItem<T>> for HashIO
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<IOLogItem<T>, HashIOError>
+            where R: Read {
+        let parent_hash = try!(read_hash(read));
+        let item;
+        {
+            let hash_val = try!(read_hash(read));
+            item = try!(self.get(&hash_val));
+        }
+        Ok(IOLogItem {
+            parent_hash: parent_hash,
+            item: item
+        })
+    }
+
+    fn store_childs(&self, hashable: &IOLogItem<T>) -> Result<(), HashIOError> {
+        try!(self.put(&hashable.item));
+        Ok(())
+    }
+
+    fn store_hashable<W>(&self, hashable: &IOLogItem<T>, write: &mut W) -> Result<(), HashIOError>
+            where W: Write {
+        try!(hashable.write_to(write));
+        Ok(())
+    }
+}
+
+pub struct IOLog<T>
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    pub head: Option<IOLogItem<T>>
+}
+
+
+
+impl<T> Log for IOLogItem<T>
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    type Item = T;
+
+    /// Add new entry to the log
+    fn push(&mut self, _: T) -> Hash {
+        Hash::None
+    }
+
+
+    /// Head hash
+    fn head_hash(&self) -> Option<Hash> {
+        None
+    }
+
+    /// Get the parent hash of the given hash.
+    ///
+    /// If the given hash is the first entry without a successor, it returns
+    /// None, otherwise it returns the hash wrapped in Option::Some.
+    ///
+    /// # Errors
+    /// Throws an error if an entry of the hash was not found.
+    fn parent_hash(&self, _: Hash) -> Result<Option<Hash>, LogError> {
+        Ok(Option::None)
+    }
+
+    /// Get the borrowed entry of the given hash
+    ///
+    /// # Errors
+    /// Throws an error if an entry of the hash was not found.
+    fn get(&self, _: Hash) -> Result<&Self::Item, LogError> {
+        Err(LogError::EntryNotFound(Hash::None))
+    }
+
+    /// Get a mutable entry of the given hash
+    ///
+    /// # Errors
+    /// Throws an error if an entry of the hash was not found.
+    fn get_mut(&mut self, _: Hash) -> Result<&mut Self::Item, LogError> {
+        Err(LogError::EntryNotFound(Hash::None))
+    }
+}

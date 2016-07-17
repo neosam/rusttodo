@@ -4,6 +4,7 @@ use io::*;
 use log::*;
 use std::io;
 use std::io::{Write, Read};
+use std::fs::{File};
 
 impl From<HashIOError> for LogError {
     fn from(_: HashIOError) -> LogError {
@@ -73,7 +74,20 @@ pub struct IOLog<T>
     pub hashio: HashIO
 }
 
-
+impl<T> IOLog<T>
+        where T: Hashable,
+              HashIO: HashIOImpl<T> {
+    pub fn write_head(&self) -> Result<(), io::Error> {
+        if self.head.is_some() {
+            let hash = self.head.as_ref().unwrap().as_hash();
+            let hashio = &self.hashio;
+            let filename =  format!("{}/head", hashio.base_path);
+            let mut file = try!(File::create(filename));
+            try!(write_hash(&hash, &mut file));
+        }
+        Ok(())
+    }
+}
 
 impl<T> Log for IOLog<T>
         where T: Hashable,
@@ -95,6 +109,10 @@ impl<T> Log for IOLog<T>
         }
         let hash = new_head.as_hash();
         self.head = Some(new_head);
+        match self.write_head() {
+            Ok(_) => (),
+            Err(_) => { return Hash::None }
+        };
         hash
     }
 
@@ -136,8 +154,18 @@ impl<T> IOLog<T>
         where T: Hashable,
             HashIO: HashIOImpl<T> {
     pub fn new(path: String) -> IOLog<T> {
+        let hashio = HashIO::new(path.clone());
+        let filename = format!("{}/head", path.clone());
+        let hash = match File::open(filename) {
+            Ok(mut file) => read_hash(&mut file).unwrap_or(Hash::None),
+            Err(_) => Hash::None
+        };
+        let head = match hash {
+            Hash::None => Option::None,
+            _ => hashio.get::<IOLogItem<T>>(&hash).ok()
+        };
         IOLog{
-            head: None,
+            head: head,
             hashio: HashIO::new(path)
         }
     }
@@ -153,6 +181,7 @@ mod test {
     use super::*;
     use std::io::{Read, Write};
     use std::io;
+    use std::fs::remove_dir_all;
 
     tbd_model!(A, [
         [a: u8, write_u8, read_u8]
@@ -162,16 +191,26 @@ mod test {
 
     #[test]
     fn test() {
+        remove_dir_all("logtest").ok();
         let mut log = IOLog::<A>::new("logtest".to_string());
+        // make sure the log is empty
+        assert_eq!(None, log.head_hash());
+
         let one = A{a: 1, b: "one".to_string()};
         let two = A{a: 2, b: "two".to_string()};
         let hash_one = log.push(one.clone());
         let hash_two = log.push(two.clone());
+
         print!("Hash written: {}\n", hash_one.as_string());
         print!("Hash written: {}\n", hash_two.as_string());
         let one_ref: A = log.get(hash_one).ok().unwrap();
         let two_ref: A = log.get(hash_two).ok().unwrap();
         assert_eq!(one, one_ref);
         assert_eq!(two, two_ref);
+
+        // Verify if reloading works correcty
+        let log2 = IOLog::<A>::new("logtest".to_string());
+        let two_ref2: A = log.get(log2.head_hash().unwrap()).ok().unwrap();
+        assert_eq!(two, two_ref2);
     }
 }

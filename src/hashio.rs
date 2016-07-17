@@ -55,9 +55,8 @@ impl From<io::Error> for HashIOError {
     }
 }
 
-#[warn(dead_code)]
 pub struct HashIO {
-    base_path: String
+    pub base_path: String
 }
 
 pub trait HashIOImpl<T: Hashable> {

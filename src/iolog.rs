@@ -82,11 +82,6 @@ impl<T> Log for IOLog<T>
 
     /// Add new entry to the log
     fn push(&mut self, hashable: T) -> Hash {
-        match self.hashio.put(&hashable) {
-            Ok(_) => (),
-            Err(_) => ()
-        }
-        let hash = hashable.as_hash();
         let new_head = IOLogItem {
             parent_hash: match &self.head {
                 &Option::None => Hash::None,
@@ -94,6 +89,11 @@ impl<T> Log for IOLog<T>
             },
             item: hashable
         };
+        match self.hashio.put::<IOLogItem<T>>(&new_head) {
+            Ok(_) => (),
+            Err(_) => ()
+        }
+        let hash = new_head.as_hash();
         self.head = Some(new_head);
         hash
     }
@@ -132,3 +132,46 @@ impl<T> Log for IOLog<T>
     }
 }
 
+impl<T> IOLog<T>
+        where T: Hashable,
+            HashIO: HashIOImpl<T> {
+    pub fn new(path: String) -> IOLog<T> {
+        IOLog{
+            head: None,
+            hashio: HashIO::new(path)
+        }
+    }
+}
+
+
+#[cfg(test)]
+mod test {
+    use super::super::hash::*;
+    use super::super::hashio::*;
+    use super::super::io::*;
+    use super::super::log::*;
+    use super::*;
+    use std::io::{Read, Write};
+    use std::io;
+
+    tbd_model!(A, [
+        [a: u8, write_u8, read_u8]
+     ], [
+        [b: String]
+     ]);
+
+    #[test]
+    fn test() {
+        let mut log = IOLog::<A>::new("logtest".to_string());
+        let one = A{a: 1, b: "one".to_string()};
+        let two = A{a: 2, b: "two".to_string()};
+        let hash_one = log.push(one.clone());
+        let hash_two = log.push(two.clone());
+        print!("Hash written: {}\n", hash_one.as_string());
+        print!("Hash written: {}\n", hash_two.as_string());
+        let one_ref: A = log.get(hash_one).ok().unwrap();
+        let two_ref: A = log.get(hash_two).ok().unwrap();
+        assert_eq!(one, one_ref);
+        assert_eq!(two, two_ref);
+    }
+}

@@ -124,11 +124,21 @@ pub fn read_bytes(reader: &mut Read, n: usize) -> Result<Vec<u8>, io::Error> {
 
 pub fn write_hash<W>(hash: &Hash, write: &mut W) -> Result<usize, io::Error> where W: Write {
     let bytes = hash.get_bytes();
+    try!(write_u8(match hash {
+        &Hash::None => 0,
+        &Hash::Sha3(_) => 1
+    }, write));
     write.write(&*bytes)
 }
 
 pub fn read_hash<R>(read: &mut R) -> Result<Hash, io::Error> where R: Read {
-    let mut bytes = [0u8; 32];
-    try!(read.read(&mut bytes));
-    Ok(Hash::Sha3(bytes))
+    let identifier = try!(read_u8(read));
+    match identifier {
+        1 => {
+            let mut bytes = [0u8; 32];
+            try!(read.read(&mut bytes));
+            Ok(Hash::Sha3(bytes))
+        }
+        _ => Ok(Hash::None)
+    }
 }

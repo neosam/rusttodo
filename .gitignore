@@ -4,3 +4,4 @@ Cargo.lock
 .idea
 savetest/
 *.iml
+logtest/

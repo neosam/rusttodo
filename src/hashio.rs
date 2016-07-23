@@ -20,6 +20,7 @@ use std::{io, error, fmt};
 use hash::*;
 use io::*;
 use std::fs::{File, create_dir_all};
+use std::collections::BTreeMap;
 
 
 
@@ -146,6 +147,11 @@ impl HashIOImpl<String> for HashIO {
         Ok(res)
     }
 }
+
+
+
+
+
 
 macro_rules! tbd_model {
     ($model_name:ident,
@@ -311,5 +317,83 @@ mod test2 {
         assert_eq!(b, b_read);
         assert_eq!(b.foo, b_read.foo);
         assert_eq!(b.foobar, b_read.foobar);
+    }
+}
+
+
+impl<T, U> Writable for BTreeMap<T, U>
+    where T: Writable, U: Writable, T: Hashable, U: Hashable {
+    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
+        try!(write_u32(self.len() as u32, write));
+        let mut size: usize = 0;
+        for (key, value) in self {
+            size += try!(write_hash(&key.as_hash(), write));
+            size += try!(write_hash(&value.as_hash(), write));
+        }
+        Ok(size)
+    }
+}
+
+impl<T, U> Hashable for BTreeMap<T, U>
+    where BTreeMap<T, U>: Writable {
+    fn as_hash(&self) -> Hash {
+        self.writable_to_hash()
+    }
+}
+
+impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
+    where HashIO: HashIOImpl<T>,
+          HashIO: HashIOImpl<U>,
+          T: Writable, U: Writable,
+          T: Hashable, U: Hashable,
+          T: Ord {
+    fn store_hashable<W>(&self, hashable: &BTreeMap<T, U>, write: &mut W) -> Result<(), HashIOError>
+        where W: Write {
+        for (key, value) in hashable {
+            try!(self.put(key));
+            try!(self.put(value));
+        }
+        try!(hashable.write_to(write));
+        Ok(())
+    }
+
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<BTreeMap<T, U>, HashIOError>
+        where R: Read {
+        let mut res = BTreeMap::<T, U>::new();
+        let entries = try!(read_u32(read));
+        for _ in 0..entries {
+            let key_hash = try!(read_hash(read));
+            let value_hash = try!(read_hash(read));
+            let key = try!(self.get(&key_hash));
+            let value = try!(self.get(&value_hash));
+            res.insert(key, value);
+        }
+        Ok(res)
+    }
+}
+
+#[cfg(test)]
+mod btreemaptest {
+    use super::super::hash::*;
+    use super::super::hashio::*;
+    use super::super::io::*;
+    use std::io::{Read, Write};
+    use std::io;
+    use std::collections::BTreeMap;
+
+    tbd_model!(A, [], [
+        [a: BTreeMap<String, String>]
+    ]);
+
+    #[test]
+    fn test() {
+        let hash_io = HashIO::new("savetest/btreemaptest".to_string());
+        let mut a = A { a: BTreeMap::new() };
+        a.a.insert("one".to_string(), "1".to_string());
+        a.a.insert("two".to_string(), "2".to_string());
+        let hash = a.as_hash();
+        hash_io.put(&a).unwrap();
+        let a_2 = hash_io.get(&hash).unwrap();
+        assert_eq!(a, a_2);
     }
 }

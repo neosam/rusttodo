@@ -13,7 +13,41 @@ use hashio::*;
 use hash::*;
 use std::io::{Write, Read};
 use std::io;
-use self::time::Tm;
+use self::time::{Tm, now};
+use std::fmt;
+use std::error;
+
+#[derive(Debug)]
+pub enum TaskLogError {
+    LogError(LogError),
+    NoState
+}
+
+impl fmt::Display for TaskLogError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TaskLogError::LogError(ref err) => err.fmt(f),
+            TaskLogError::NoState => write!(f, "State is none")
+        }
+    }
+}
+
+impl error::Error for TaskLogError {
+    fn description(&self) -> &str {
+        match *self {
+            TaskLogError::LogError(ref err) => err.description(),
+            TaskLogError::NoState => "State is none"
+        }
+    }
+}
+
+impl From<LogError> for TaskLogError {
+    fn from(err: LogError) -> TaskLogError {
+        TaskLogError::LogError(err)
+    }
+}
+
+
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TaskAction {
@@ -110,7 +144,7 @@ pub struct TaskLog {
 }
 
 impl TaskLog {
-    pub fn load_head(&mut self) -> Result<(), LogError> {
+    pub fn load_head(&mut self) -> Result<(), TaskLogError> {
         let stat_hash = self.log.head_hash();
         match stat_hash {
             None => self.state = None,
@@ -120,6 +154,22 @@ impl TaskLog {
             }
         };
         Ok(())
+    }
+
+    pub fn store_state(&mut self, action: TaskAction) -> Result<(), TaskLogError> {
+        match &self.state {
+            &None => Err(TaskLogError::NoState),
+            &Some(ref state) => {
+                let tm = now();
+                let entry = TaskLogEntry {
+                    timestamp: tm,
+                    action: action,
+                    state: state.clone()
+                };
+                self.log.push(entry);
+                Ok(())
+            }
+        }
     }
 }
 

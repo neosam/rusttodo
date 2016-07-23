@@ -35,6 +35,18 @@ pub fn read_u32(read: &mut Read) -> Result<u32, io::Error> {
     Ok(BigEndian::read_u32(&bytes))
 }
 
+pub fn write_f32(f: f32, write: &mut Write) -> Result<usize, io::Error> {
+    let mut bytes = [0u8; 4];
+    BigEndian::write_f32(&mut bytes, f);
+    write.write(&bytes)
+}
+
+pub fn read_f32(read: &mut Read) -> Result<f32, io::Error> {
+    let mut bytes = [0u8; 4];
+    try!(read.read(&mut bytes));
+    Ok(BigEndian::read_f32(&bytes))
+}
+
 
 /// Write itself to any write trait.
 ///

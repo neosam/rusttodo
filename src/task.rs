@@ -66,14 +66,21 @@ extern crate rand;
 
 use self::time::Duration;
 use std::collections::BTreeMap;
+use io::*;
+use hashio::*;
+use std::io;
+use hash::*;
+use std::io::{Read, Write};
 
 /// Base task type
-#[derive(Clone)]
-pub struct Task {
-    pub title: String,
-    pub description: String,
-    pub factor: f32
-}
+tbd_model!(Task, [
+        [factor: f32, write_f32, read_f32]
+    ], [
+        [title: String],
+        [description: String]
+    ]);
+
+
 
 /// A task which got activated.
 #[derive(Clone)]

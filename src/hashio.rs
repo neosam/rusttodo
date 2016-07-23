@@ -159,9 +159,9 @@ macro_rules! tbd_model {
             [ $( [$hash_name:ident : $hash_type:ty] ),* ]) => {
 
         #[derive(Debug, Clone, PartialEq)]
-        struct $model_name {
-            $($attr_name: $attr_type,),*
-            $($hash_name: $hash_type),*
+        pub struct $model_name {
+            $(pub $attr_name: $attr_type,),*
+            $(pub $hash_name: $hash_type),*
         }
 
         impl Writable for $model_name {
@@ -209,11 +209,6 @@ macro_rules! tbd_model {
     }
 }
 
-tbd_model!(A, [
-        [a: u8, write_u8, read_u8]
-    ], [
-        [c: String]
-    ]);
 
 
 #[cfg(test)]

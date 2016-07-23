@@ -1,5 +1,4 @@
 //! Task management library to successfully complete tasks
-pub mod task;
 #[macro_use]
 pub mod hash;
 #[macro_use]
@@ -8,4 +7,6 @@ pub mod io;
 pub mod hashio;
 pub mod log;
 pub mod iolog;
+pub mod task;
+
 pub mod tasklog;

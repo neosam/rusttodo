@@ -160,7 +160,7 @@ macro_rules! tbd_model {
 
         #[derive(Debug, Clone, PartialEq)]
         pub struct $model_name {
-            $(pub $attr_name: $attr_type,),*
+            $(pub $attr_name: $attr_type,)*
             $(pub $hash_name: $hash_type),*
         }
 

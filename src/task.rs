@@ -64,7 +64,7 @@
 extern crate time;
 extern crate rand;
 
-use self::time::Duration;
+use self::time::{Duration, Tm};
 use std::collections::BTreeMap;
 use io::*;
 use hashio::*;
@@ -83,29 +83,33 @@ tbd_model!(Task, [
 
 
 /// A task which got activated.
-#[derive(Clone)]
-pub struct ActiveTask {
-    pub task: Task,
-    pub start: time::Tm,
-    pub due: time::Tm
-}
+tbd_model!(ActiveTask, [
+        [start: Tm, write_tm, read_tm],
+        [due: Tm, write_tm, read_tm]
+    ], [
+        [task: Task]
+    ]);
+
 
 /// A task which is about to get activated
-#[derive(Clone)]
-pub struct PooledTask {
-    pub task: Task,
-    pub propability: f32,
-    pub cool_down: i16,
-    pub due_days: i16,
-    pub cooling_until: time::Tm
-}
+tbd_model!(PooledTask, [
+        [propability: f32, write_f32, read_f32],
+        [cool_down: i16, write_i16, read_i16],
+        [due_days: i16, write_i16, read_i16],
+        [cooling_until: Tm, write_tm, read_tm]
+    ], [
+        [task: Task]
+    ]);
+
+
 
 /// Overall state of the tasks
-pub struct TaskStat {
-    pub active: BTreeMap<String, ActiveTask>,
-    pub pool: BTreeMap<String, PooledTask>,
-    pub ref_tm: time::Tm,
-}
+tbd_model!(TaskStat, [
+        [ref_tm: Tm, write_tm, read_tm]
+    ], [
+        [active: BTreeMap<String, ActiveTask>],
+        [pool: BTreeMap<String, PooledTask>]
+    ]);
 
 
 

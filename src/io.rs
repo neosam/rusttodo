@@ -1,5 +1,6 @@
 extern crate crypto;
 extern crate byteorder;
+extern crate time;
 
 use std::io::{Read, Write};
 use self::crypto::sha3::Sha3;
@@ -8,14 +9,15 @@ use self::byteorder::{BigEndian, ByteOrder};
 use std::io;
 
 use hash::*;
+use self::time::*;
 
-pub fn write_u8(i: u8, write: &mut Write) -> Result<usize, io::Error> {
+pub fn write_u8<W>(i: u8, write: &mut W) -> Result<usize, io::Error> where W: Write {
     let mut bytes = [0u8; 1];
     bytes[0] = i;
     write.write(&bytes)
 }
 
-pub fn read_u8(read: &mut Read) -> Result<u8, io::Error> {
+pub fn read_u8<R>(read: &mut R) -> Result<u8, io::Error> where R: Read {
     let mut bytes = [0u8; 1];
     try!(read.read(&mut bytes));
     Ok(bytes[0])
@@ -23,25 +25,49 @@ pub fn read_u8(read: &mut Read) -> Result<u8, io::Error> {
 
 
 
-pub fn write_u32(i: u32, write: &mut Write) -> Result<usize, io::Error> {
+pub fn write_u32<W>(i: u32, write: &mut W) -> Result<usize, io::Error> where W: Write {
     let mut bytes = [0u8; 4];
     BigEndian::write_u32(&mut bytes, i);
     write.write(&bytes)
 }
 
-pub fn read_u32(read: &mut Read) -> Result<u32, io::Error> {
+pub fn read_u32<R>(read: &mut R) -> Result<u32, io::Error> where R: Read {
     let mut bytes = [0u8; 4];
     try!(read.read(&mut bytes));
     Ok(BigEndian::read_u32(&bytes))
 }
 
-pub fn write_f32(f: f32, write: &mut Write) -> Result<usize, io::Error> {
+pub fn write_i32<W>(i: i32, write: &mut W) -> Result<usize, io::Error> where W: Write{
+    let mut bytes = [0u8; 4];
+    BigEndian::write_i32(&mut bytes, i);
+    write.write(&bytes)
+}
+
+pub fn read_i32<R>(read: &mut R) -> Result<i32, io::Error> where R: Read {
+    let mut bytes = [0u8; 4];
+    try!(read.read(&mut bytes));
+    Ok(BigEndian::read_i32(&bytes))
+}
+
+pub fn write_i16<W>(i: i16, write: &mut W) -> Result<usize, io::Error> where W: Write{
+    let mut bytes = [0u8; 2];
+    BigEndian::write_i16(&mut bytes, i);
+    write.write(&bytes)
+}
+
+pub fn read_i16<R>(read: &mut R) -> Result<i16, io::Error> where R: Read {
+    let mut bytes = [0u8; 2];
+    try!(read.read(&mut bytes));
+    Ok(BigEndian::read_i16(&bytes))
+}
+
+pub fn write_f32<W>(f: f32, write: &mut W) -> Result<usize, io::Error> where W: Write {
     let mut bytes = [0u8; 4];
     BigEndian::write_f32(&mut bytes, f);
     write.write(&bytes)
 }
 
-pub fn read_f32(read: &mut Read) -> Result<f32, io::Error> {
+pub fn read_f32<R>(read: &mut R) -> Result<f32, io::Error> where R: Read {
     let mut bytes = [0u8; 4];
     try!(read.read(&mut bytes));
     Ok(BigEndian::read_f32(&bytes))
@@ -153,4 +179,47 @@ pub fn read_hash<R>(read: &mut R) -> Result<Hash, io::Error> where R: Read {
         }
         _ => Ok(Hash::None)
     }
+}
+
+pub fn write_tm<W>(tm: Tm, write: &mut W) -> Result<usize, io::Error> where W: Write {
+    let mut size : usize = 0;
+    size += try!(write_i32(tm.tm_sec, write));
+    size += try!(write_i32(tm.tm_min, write));
+    size += try!(write_i32(tm.tm_hour, write));
+    size += try!(write_i32(tm.tm_mday, write));
+    size += try!(write_i32(tm.tm_mon, write));
+    size += try!(write_i32(tm.tm_year, write));
+    size += try!(write_i32(tm.tm_wday, write));
+    size += try!(write_i32(tm.tm_yday, write));
+    size += try!(write_i32(tm.tm_isdst, write));
+    size += try!(write_i32(tm.tm_utcoff, write));
+    size += try!(write_i32(tm.tm_nsec, write));
+    Ok(size)
+}
+
+pub fn read_tm<R>(read: &mut R) -> Result<Tm, io::Error> where R: Read {
+    let sec = try!(read_i32(read));
+    let min = try!(read_i32(read));
+    let hour = try!(read_i32(read));
+    let mday = try!(read_i32(read));
+    let mon = try!(read_i32(read));
+    let year = try!(read_i32(read));
+    let wday = try!(read_i32(read));
+    let yday = try!(read_i32(read));
+    let isdst = try!(read_i32(read));
+    let utcoff = try!(read_i32(read));
+    let nsec = try!(read_i32(read));
+    Ok(Tm{
+        tm_sec: sec,
+        tm_min: min,
+        tm_hour: hour,
+        tm_mday: mday,
+        tm_mon: mon,
+        tm_year: year,
+        tm_wday: wday,
+        tm_yday: yday,
+        tm_isdst: isdst,
+        tm_utcoff: utcoff,
+        tm_nsec: nsec
+    })
 }

@@ -21,11 +21,13 @@ use hash::*;
 use io::*;
 use std::fs::{File, create_dir_all};
 use std::collections::BTreeMap;
+use std::vec::Vec;
 
 
 
 #[derive(Debug)]
 pub enum HashIOError {
+    Undefined(String),
     IOError(io::Error),
     ParseError(Box<error::Error>)
 }
@@ -35,6 +37,7 @@ pub enum HashIOError {
 impl fmt::Display for HashIOError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            HashIOError::Undefined(ref msg) => write!(f, "Undefined error: {}", msg),
             HashIOError::IOError(ref err) => err.fmt(f),
             HashIOError::ParseError(ref err) => write!(f, "Parse error: {}", err)
         }
@@ -44,6 +47,7 @@ impl fmt::Display for HashIOError {
 impl error::Error for HashIOError {
     fn description(&self) -> &str {
         match *self {
+            HashIOError::Undefined(ref msg) => msg,
             HashIOError::IOError(ref err) => err.description(),
             HashIOError::ParseError(ref err) => err.description()
         }
@@ -390,5 +394,49 @@ mod btreemaptest {
         hash_io.put(&a).unwrap();
         let a_2 = hash_io.get(&hash).unwrap();
         assert_eq!(a, a_2);
+    }
+}
+
+impl<T> Writable for Vec<T>
+    where T: Writable, T: Hashable {
+    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
+        try!(write_u32(self.len() as u32, write));
+        let mut size: usize = 0;
+        for value in self {
+            size += try!(write_hash(&value.as_hash(), write));
+        }
+        Ok(size)
+    }
+}
+
+impl<T> Hashable for Vec<T>
+    where Vec<T>: Writable {
+    fn as_hash(&self) -> Hash {
+        self.writable_to_hash()
+    }
+}
+
+impl<T> HashIOImpl<Vec<T>> for HashIO
+    where HashIO: HashIOImpl<T>,
+          T: Writable, T: Hashable {
+    fn store_hashable<W>(&self, hashable: &Vec<T>, write: &mut W) -> Result<(), HashIOError>
+        where W: Write {
+        for value in hashable {
+            try!(self.put(value));
+        }
+        try!(hashable.write_to(write));
+        Ok(())
+    }
+
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<Vec<T>, HashIOError>
+        where R: Read {
+        let mut res = Vec::<T>::new();
+        let entries = try!(read_u32(read));
+        for _ in 0..entries {
+            let value_hash = try!(read_hash(read));
+            let value = try!(self.get(&value_hash));
+            res.push(value);
+        }
+        Ok(res)
     }
 }

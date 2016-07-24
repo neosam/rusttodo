@@ -43,9 +43,9 @@
 //!     );
 //!
 //!     // Should have the first task as active task
-//!     assert_eq!("A task", task_stat.all_actives()[0].task.title);
+//!     assert_eq!("A task", task_stat.all_actives().unwrap()[0].task.title);
 //!     // Should also have the second task as pooled task
-//!     assert_eq!("Pooled task", task_stat.all_pooled()[0].task.title);
+//!     assert_eq!("Pooled task", task_stat.all_pooled().unwrap()[0].task.title);
 //!
 //!     // Mark the active task as completed
 //!     assert_eq!(true, task_stat.mark_done("A task".to_string()));
@@ -55,7 +55,7 @@
 //!     assert_eq!(false, task_stat.mark_done("A task".to_string()));
 //!
 //!     // Active tasks should be empty now
-//!     assert_eq!(0, task_stat.all_actives().len());
+//!     assert_eq!(0, task_stat.all_actives().unwrap().len());
 //! }
 //! ```
 
@@ -127,14 +127,14 @@ impl ActiveTask {
 
 pub trait TaskStatTrait {
     fn add_active_task(&mut self, title: String, description: String,
-                       factor: f32, due_days: i16) -> ActiveTask;
+                       factor: f32, due_days: i16) -> Option<ActiveTask>;
     fn add_pooled_task(&mut self, title: String, description: String,
                        factor: f32, propability: f32,
-                       cool_down: i16, due_days: i16) -> PooledTask;
-    fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Vec<ActiveTask>;
+                       cool_down: i16, due_days: i16) -> Option<PooledTask>;
+    fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Option<Vec<ActiveTask>>;
     fn mark_done(&mut self, title: String) -> bool;
-    fn all_actives(&self) -> Vec<ActiveTask>;
-    fn all_pooled(&self) -> Vec<PooledTask>;
+    fn all_actives(&self) -> Option<Vec<ActiveTask>>;
+    fn all_pooled(&self) -> Option<Vec<PooledTask>>;
 }
 
 /// Floor to the day if tm and remove time zone information
@@ -225,7 +225,7 @@ impl TaskStat {
 }
 
 impl TaskStatTrait for TaskStat {
-    fn activate<R: rand::Rng>(&mut self, r: &mut R) -> Vec<ActiveTask>{
+    fn activate<R: rand::Rng>(&mut self, r: &mut R) -> Option<Vec<ActiveTask>> {
         let mut insert_tasks = Vec::new();
         let mut result : Vec<ActiveTask> = Vec::new();
         {
@@ -239,7 +239,7 @@ impl TaskStatTrait for TaskStat {
         for p_task in insert_tasks {
             result.push(self.activate_p_task(&p_task));
         }
-        result
+        Some(result)
     }
 
     /// Generate a new task and add it to the active list
@@ -247,7 +247,7 @@ impl TaskStatTrait for TaskStat {
                            title: String,
                            description: String,
                            factor: f32,
-                           due_days: i16) -> ActiveTask {
+                           due_days: i16) -> Option<ActiveTask> {
         floor_tm_day(&mut self.ref_tm);
         let duration = Duration::days(due_days as i64);
         let due = self.ref_tm + duration;
@@ -261,12 +261,12 @@ impl TaskStatTrait for TaskStat {
             due: due
         };
         self.active.insert(a_task.task.title.clone(), a_task.clone());
-        a_task
+        Some(a_task)
     }
 
     fn add_pooled_task(&mut self, title: String, description: String,
                        factor: f32, propability: f32,
-                       cool_down: i16, due_days: i16) -> PooledTask {
+                       cool_down: i16, due_days: i16) -> Option<PooledTask> {
         floor_tm_day(&mut self.ref_tm);
         let p_task = PooledTask {
             task: Task {
@@ -280,7 +280,7 @@ impl TaskStatTrait for TaskStat {
             cooling_until: self.ref_tm
         };
         self.pool.insert(p_task.task.title.clone(), p_task.clone());
-        p_task
+        Some(p_task)
     }
 
     fn mark_done(&mut self, title: String) -> bool {
@@ -293,20 +293,20 @@ impl TaskStatTrait for TaskStat {
         }
     }
 
-    fn all_actives(&self) -> Vec<ActiveTask> {
+    fn all_actives(&self) -> Option<Vec<ActiveTask>> {
         let mut res: Vec<ActiveTask> = Vec::new();
         for (_, a_task) in self.active.iter() {
             res.push(a_task.clone());
         }
-        res
+        Some(res)
     }
 
-    fn all_pooled(&self)  -> Vec<PooledTask> {
+    fn all_pooled(&self)  -> Option<Vec<PooledTask>> {
         let mut res: Vec<PooledTask> = Vec::new();
         for (_, a_task) in self.pool.iter() {
             res.push(a_task.clone());
         }
-        res
+        Some(res)
     }
 }
 

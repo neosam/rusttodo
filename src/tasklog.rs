@@ -173,3 +173,90 @@ impl TaskLog {
     }
 }
 
+impl TaskStatTrait for TaskLog {
+    fn add_active_task(&mut self, title: String, description: String,
+                       factor: f32, due_days: i16) -> Option<ActiveTask> {
+        // Borrow mutable state
+        self.state.as_mut()
+            // Unwrap the state, return None otherwise
+            .and_then(| state |
+                // Run the original function
+                state.add_active_task(title, description, factor, due_days)
+                    // And return the ActiveTask Option, return None on error
+                    .and_then(| a_task | Some(a_task)))
+            // Unwrap tha ActiveTask again, return None otherwise
+            .and_then(| a_task |
+                // Save the task
+                self.store_state(TaskAction::ScheduleTask(a_task.clone()))
+                    // Convert the result to an Option, discarding the error
+                    .ok()
+                    // Return the ActiveTask action, return None on an error
+                    .and(Some(a_task)))
+    }
+
+    fn add_pooled_task(&mut self, title: String, description: String,
+                       factor: f32, propability: f32,
+                       cool_down: i16, due_days: i16) -> Option<PooledTask> {
+        // Borrow mutable state
+        self.state.as_mut()
+            // Unwrap the state, return None otherwise
+            .and_then(| state |
+                          // Run the original function
+                          state.add_pooled_task(title, description, factor,
+                                                propability, cool_down, due_days)
+                              // And return the ActiveTask Option, return None on error
+                              .and_then(| p_task | Some(p_task)))
+            // Unwrap tha ActiveTask again, return None otherwise
+            .and_then(| p_task |
+                          // Save the task
+                          self.store_state(TaskAction::PoolTask(p_task.clone()))
+                              // Convert the result to an Option, discarding the error
+                              .ok()
+                              // Return the ActiveTask action, return None on an error
+                              .and(Some(p_task)))
+    }
+
+    fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Option<Vec<ActiveTask>> {
+        // Borrow mutable state
+        self.state.as_mut()
+            // Unwrap the state, return None otherwise
+            .and_then(| state |
+                          // Run the original function
+                          state.activate(rng)
+                              // And return the ActiveTask Option, return None on error
+                              .and_then(| a_tasks | Some(a_tasks)))
+            // Unwrap tha ActiveTask again, return None otherwise
+            .and_then(| a_tasks |
+                          // Save the task
+                          self.store_state(TaskAction::ActivateTask(a_tasks.clone()))
+                              // Convert the result to an Option, discarding the error
+                              .ok()
+                              // Return the ActiveTask action, return None on an error
+                              .and(Some(a_tasks)))
+    }
+
+    fn mark_done(&mut self, title: String) -> bool {
+        self.state.as_mut()
+            .and_then(| state |
+                if state.mark_done(title.clone()) {
+                    state.active.get(&title).cloned()
+                } else {
+                    None
+                }
+            ).and_then(| a_task | {
+                self.store_state(TaskAction::CompleteTask(a_task)).ok()
+            }).is_some()
+    }
+
+    fn all_actives(&self) -> Option<Vec<ActiveTask>> {
+        self.state.as_ref().and_then(| state | {
+            state.all_actives()
+        })
+    }
+
+    fn all_pooled(&self) -> Option<Vec<PooledTask>> {
+        self.state.as_ref().and_then(| state | {
+            state.all_pooled()
+        })
+    }
+}

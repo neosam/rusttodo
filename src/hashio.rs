@@ -186,6 +186,7 @@ macro_rules! tbd_model {
         impl HashIOImpl<$model_name> for HashIO {
             fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError>
                     where R: Read {
+                try!(read_u32(read));
                 $( let $attr_name = try!($imp_fn(read)); )* ;
                 $(
                     let $hash_name;
@@ -324,6 +325,7 @@ mod test2 {
 impl<T, U> Writable for BTreeMap<T, U>
     where T: Writable, U: Writable, T: Hashable, U: Hashable {
     fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
+        try!(write_u32(0, write));
         try!(write_u32(self.len() as u32, write));
         let mut size: usize = 0;
         for (key, value) in self {
@@ -360,6 +362,7 @@ impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
     fn receive_hashable<R>(&self, read: &mut R) -> Result<BTreeMap<T, U>, HashIOError>
         where R: Read {
         let mut res = BTreeMap::<T, U>::new();
+        try!(read_u32(read));
         let entries = try!(read_u32(read));
         for _ in 0..entries {
             let key_hash = try!(read_hash(read));
@@ -401,6 +404,7 @@ mod btreemaptest {
 impl<T> Writable for Vec<T>
     where T: Writable, T: Hashable {
     fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
+        try!(write_u32(0, write));
         try!(write_u32(self.len() as u32, write));
         let mut size: usize = 0;
         for value in self {
@@ -432,6 +436,7 @@ impl<T> HashIOImpl<Vec<T>> for HashIO
     fn receive_hashable<R>(&self, read: &mut R) -> Result<Vec<T>, HashIOError>
         where R: Read {
         let mut res = Vec::<T>::new();
+        try!(read_u32(read));
         let entries = try!(read_u32(read));
         for _ in 0..entries {
             let value_hash = try!(read_hash(read));

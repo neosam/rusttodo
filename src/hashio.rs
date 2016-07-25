@@ -171,6 +171,7 @@ macro_rules! tbd_model {
         impl Writable for $model_name {
             fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
                 let mut size = 0;
+                try!(write_u32(0, write));
                 size += $( try!($exp_fn(self.$attr_name, write)); )*
                 $(
                     try!(write_hash(&self.$hash_name.as_hash(), write));

@@ -144,6 +144,13 @@ pub struct TaskLog {
 }
 
 impl TaskLog {
+    pub fn new(path: String) -> TaskLog {
+        TaskLog {
+            log: IOLog::new(path),
+            state: None
+        }
+    }
+
     pub fn load_head(&mut self) -> Result<(), TaskLogError> {
         let stat_hash = self.log.head_hash();
         match stat_hash {

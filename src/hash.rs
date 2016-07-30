@@ -34,6 +34,28 @@ fn half_byte_to_string(byte: u8) -> String {
     }.to_string()
 }
 
+fn hex_str_to_u8(byte: u8) -> u8 {
+    match byte {
+        0x30 => 0,
+        0x31 => 1,
+        0x32 => 2,
+        0x33 => 3,
+        0x34 => 4,
+        0x35 => 5,
+        0x36 => 6,
+        0x37 => 7,
+        0x38 => 8,
+        0x39 => 9,
+        0x61 => 10,
+        0x62 => 11,
+        0x63 => 12,
+        0x64 => 13,
+        0x65 => 14,
+        0x66 => 15,
+        _ => 0
+    }
+}
+
 
 
 fn byte_to_string(byte: u8) -> String {
@@ -64,6 +86,16 @@ impl Hash {
     /// Returns the bytes of the hash as hex String.
     pub fn as_string(&self) -> String {
         bytes_to_string(&*self.get_bytes())
+    }
+
+    pub fn from_string(str: String) -> Hash {
+        let bytes = str.as_bytes();
+        let mut res = [0u8; 32];
+        for i in 0..32 {
+            let value: u8 = hex_str_to_u8(bytes[2 * i]) * 16 + hex_str_to_u8(bytes[2 * i + 1]);
+            res[i] = value;
+        }
+        Hash::Sha3(res)
     }
 
     /// Returns a sha3-256 hash of the byte array.

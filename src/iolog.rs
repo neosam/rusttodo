@@ -156,6 +156,13 @@ impl<T> Log for IOLog<T>
         let item: IOLogItem<T> = try!(self.hashio.get::<IOLogItem<T>>(&hash));
         Ok(item.item)
     }
+
+    // Set defferent head
+    fn reset_head(&mut self, hash: &Hash) -> Result<(), LogError> {
+        let item: IOLogItem<T> = try!(self.hashio.get::<IOLogItem<T>>(&hash));
+        self.head = Some(item);
+        Ok(())
+    }
 }
 
 impl<T> IOLog<T>

@@ -90,6 +90,9 @@ pub trait Log {
             Err(_) => false
         }
     }
+
+    /// Reset head of log
+    fn reset_head(&mut self, hash: &Hash) -> Result<(), LogError>;
 }
 
 
@@ -274,6 +277,7 @@ impl<T: Hashable + Clone> DefaultLog<T> {
         self.save = save_fn;
         self
     }
+
 }
 
 impl<T: Hashable + Clone> Log for DefaultLog<T> {
@@ -320,6 +324,16 @@ impl<T: Hashable + Clone> Log for DefaultLog<T> {
         match self.entries.get(&hash) {
             None => Result::Err(LogError::EntryNotFound(hash)),
             Some(ref entry) => Ok(entry.entry.clone())
+        }
+    }
+
+    fn reset_head(&mut self, hash: &Hash) -> Result<(), LogError> {
+        match self.entries.get(&hash) {
+            None => Result::Err(LogError::EntryNotFound(hash.clone())),
+            Some(_) => {
+                self.head = Some(hash.clone());
+                Ok(())
+            }
         }
     }
 }

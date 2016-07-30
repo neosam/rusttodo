@@ -103,9 +103,10 @@ impl<T> Log for IOLog<T>
             },
             item: hashable
         };
+        let parent_hash = new_head.parent_hash.clone();
         match self.hashio.put::<IOLogItem<T>>(&new_head) {
             Ok(_) => (),
-            Err(_) => ()
+            Err(_) => return Hash::None
         }
         let hash = new_head.as_hash();
         self.head = Some(new_head);
@@ -113,6 +114,9 @@ impl<T> Log for IOLog<T>
             Ok(_) => (),
             Err(_) => { return Hash::None }
         };
+        if hash == parent_hash {
+            print!("WARNING:  hash equals parent hash\n");
+        }
         hash
     }
 
@@ -134,10 +138,14 @@ impl<T> Log for IOLog<T>
     /// Throws an error if an entry of the hash was not found.
     fn parent_hash(&self, hash: Hash) -> Result<Option<Hash>, LogError> {
         let item: IOLogItem<T> = try!(self.hashio.get::<IOLogItem<T>>(&hash));
-        Ok(match item.parent_hash {
+        if item.parent_hash == hash {
+            print!("WARNING: parent_hash detected redundancy\n");
+        }
+        let res = Ok(match item.parent_hash {
             Hash::None => Option::None,
-            _ => Option::Some(hash)
-        })
+            _ => Option::Some(item.parent_hash)
+        });
+        res
     }
 
     /// Get the borrowed entry of the given hash
@@ -212,5 +220,21 @@ mod test {
         let log2 = IOLog::<A>::new("logtest".to_string());
         let two_ref2: A = log.get(log2.head_hash().unwrap()).ok().unwrap();
         assert_eq!(two, two_ref2);
+
+
+        let log3 = IOLog::<A>::new("logtest".to_string());
+        assert_eq!(Ok(Some(hash_one)), log3.parent_hash(hash_two));
+
+        let mut hash_iter = LogIteratorHash::from_log(&log3);
+        print!("Hash two\n");
+        assert_eq!(Some(hash_two), hash_iter.next());
+        print!("Hash one\n");
+        assert_eq!(Some(hash_one), hash_iter.next());
+        assert_eq!(None, hash_iter.next());
+
+        let mut iter = LogIteratorRef::from_log(&log3);
+        assert_eq!(Some(two), iter.next());
+        assert_eq!(Some(one), iter.next());
+        assert_eq!(None, iter.next());
     }
 }

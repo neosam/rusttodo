@@ -83,9 +83,9 @@ impl<T> IOLog<T>
     pub fn write_head(&self) -> Result<(), io::Error> {
         if self.head.is_some() {
             let now = time::now();
-            let timestamp = format!("head-{}", now.rfc3339());
-            let hash = self.head.as_ref().unwrap().as_hash();
             let hashio = &self.hashio;
+            let timestamp = format!("{}/head-{}", hashio.base_path, now.rfc3339());
+            let hash = self.head.as_ref().unwrap().as_hash();
             let filename =  format!("{}/head", hashio.base_path);
             let mut file = try!(File::create(filename));
             try!(write_hash(&hash, &mut file));

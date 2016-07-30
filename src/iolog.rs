@@ -1,3 +1,5 @@
+extern crate time;
+
 use hash::*;
 use hashio::*;
 use io::*;
@@ -5,6 +7,7 @@ use log::*;
 use std::io;
 use std::io::{Write, Read};
 use std::fs::{File};
+use self::time::{now};
 
 impl From<HashIOError> for LogError {
     fn from(_: HashIOError) -> LogError {
@@ -79,11 +82,15 @@ impl<T> IOLog<T>
               HashIO: HashIOImpl<T> {
     pub fn write_head(&self) -> Result<(), io::Error> {
         if self.head.is_some() {
+            let now = time::now();
+            let timestamp = format!("head-{}", now.rfc3339());
             let hash = self.head.as_ref().unwrap().as_hash();
             let hashio = &self.hashio;
             let filename =  format!("{}/head", hashio.base_path);
             let mut file = try!(File::create(filename));
             try!(write_hash(&hash, &mut file));
+            let mut backup = try!(File::create(timestamp));
+            try!(write_hash(&hash, &mut backup));
         }
         Ok(())
     }

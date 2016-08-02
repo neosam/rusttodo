@@ -202,6 +202,7 @@ impl TaskStatTrait for TaskLog {
 
     fn add_active_task(&mut self, title: String, description: String,
                        factor: f32, due_days: i16) -> Result<ActiveTask, Self::Error> {
+        self.state.update_ref_tm();
         let a_task = try!(self.state.add_active_task(title, description, factor, due_days));
         try!(self.store_state(TaskAction::ScheduleTask(a_task.clone())));
         Ok(a_task)
@@ -210,6 +211,7 @@ impl TaskStatTrait for TaskLog {
     fn add_pooled_task(&mut self, title: String, description: String,
                        factor: f32, propability: f32,
                        cool_down: i16, due_days: i16) -> Result<PooledTask, Self::Error> {
+        self.state.update_ref_tm();
         let p_task = try!(self.state.add_pooled_task(title, description, factor,
                                 propability, cool_down, due_days));
         try!(self.store_state(TaskAction::PoolTask(p_task.clone())));
@@ -217,12 +219,14 @@ impl TaskStatTrait for TaskLog {
     }
 
     fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Result<Vec<ActiveTask>, Self::Error> {
+        self.state.update_ref_tm();
         let a_tasks = try!(self.state.activate(rng));
         try!(self.store_state(TaskAction::ActivateTask(a_tasks.clone())));
         Ok(a_tasks)
     }
 
     fn mark_done(&mut self, title: String) -> Result<ActiveTask, Self::Error> {
+        self.state.update_ref_tm();
         let a_task = try!(self.state.mark_done(title));
         try!(self.store_state(TaskAction::CompleteTask(a_task.clone())));
         Ok(a_task)

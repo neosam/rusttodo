@@ -167,6 +167,10 @@ impl TaskStat {
         }
     }
 
+    pub fn update_ref_tm(&mut self) {
+        self.ref_tm = time::now();
+    }
+
 
     fn pick_random_from_pool<R: rand::Rng>(&self, rng: &mut R) -> Vec<&PooledTask>{
         let mut result = Vec::new();

@@ -22,6 +22,8 @@ use io::*;
 use std::fs::{File, create_dir_all};
 use std::collections::BTreeMap;
 use std::vec::Vec;
+use std::path::Path;
+use std::fs::rename;
 
 
 
@@ -111,13 +113,29 @@ impl HashIO {
     pub fn put<T>(&self, hashable: &T) -> Result<(), HashIOError>
                 where HashIO: HashIOImpl<T>,
                       T: Hashable {
-        try!(self.store_childs(hashable));
         let hash = hashable.as_hash();
+
+        // First, if the entry already exists, skip the insert because it's already saved.
         let filename = self.filename_for_hash(&hash);
-        let dir = self.directory_for_hash(&hash);
-        try!(create_dir_all(dir));
-        let mut write = try!(File::create(filename));
-        try!(self.store_hashable(hashable, &mut write));
+        if !Path::new(&filename).exists() {
+            // First store all childs and their childs.
+            // So we make sure that all dependencies are available when the current object has
+            // finished writing.
+            try!(self.store_childs(hashable));
+
+            // First write in a slightly modified file which will be renamed when writing was
+            // finished.  So we only have valid files or nothing on the expected position but
+            // nothing unfinished.
+            let safe_filename = format!("{}_", filename);
+            let dir = self.directory_for_hash(&hash);
+            try!(create_dir_all(dir));
+            {
+                let mut write = try!(File::create(Path::new(&safe_filename)));
+                try!(self.store_hashable(hashable, &mut write));
+                // 'write' will go out of scope now and so the file handle will be closed
+            }
+            try!(rename(safe_filename, filename));
+        }
         Ok(())
     }
 }

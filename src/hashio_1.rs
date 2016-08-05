@@ -177,7 +177,7 @@ impl HashIOImpl<String> for HashIO {
 
 
 
-macro_rules! tbd_model {
+macro_rules! tbd_model_1 {
     ($model_name:ident,
             [ $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),* ] ,
             [ $( [$hash_name:ident : $hash_type:ty] ),* ]) => {
@@ -302,13 +302,13 @@ mod test2 {
     use std::io::{Read, Write};
     use std::io;
 
-    tbd_model!(A, [
+    tbd_model_1!(A, [
         [a: u8, write_u8, read_u8]
      ], [
         [b: String]
      ]);
 
-    tbd_model!(B, [  ]
+    tbd_model_1!(B, [  ]
         , [
             [foo: String],
             [bar: A],
@@ -404,7 +404,7 @@ mod btreemaptest {
     use std::io;
     use std::collections::BTreeMap;
 
-    tbd_model!(A, [], [
+    tbd_model_1!(A, [], [
         [a: BTreeMap<String, String>]
     ]);
 

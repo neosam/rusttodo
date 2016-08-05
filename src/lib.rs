@@ -4,6 +4,8 @@ pub mod hash;
 #[macro_use]
 pub mod io;
 #[macro_use]
+pub mod hashio_1;
+#[macro_use]
 pub mod hashio;
 pub mod log;
 pub mod iolog;

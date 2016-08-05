@@ -142,18 +142,6 @@ impl HashIO {
 
 
 
-impl Writable for String {
-    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
-        let str_bytes = self.as_bytes();
-        let len = usize_to_u32_bytes(str_bytes.len());
-        let mut size: usize = 0;
-        size += try!(write.write(&len));
-        size += try!(write.write(&str_bytes));
-        Ok(size)
-    }
-}
-hashable_for_writable!(String);
-
 impl HashIOImpl<String> for HashIO {
     fn store_hashable<W>(&self, hashable: &String, write: &mut W) -> Result<(), HashIOError>
                     where W: Write {
@@ -339,28 +327,6 @@ mod test2 {
     }
 }
 
-
-impl<T, U> Writable for BTreeMap<T, U>
-    where T: Writable, U: Writable, T: Hashable, U: Hashable {
-    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
-        try!(write_u32(0, write));
-        try!(write_u32(self.len() as u32, write));
-        let mut size: usize = 0;
-        for (key, value) in self {
-            size += try!(write_hash(&key.as_hash(), write));
-            size += try!(write_hash(&value.as_hash(), write));
-        }
-        Ok(size)
-    }
-}
-
-impl<T, U> Hashable for BTreeMap<T, U>
-    where BTreeMap<T, U>: Writable {
-    fn as_hash(&self) -> Hash {
-        self.writable_to_hash()
-    }
-}
-
 impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
     where HashIO: HashIOImpl<T>,
           HashIO: HashIOImpl<U>,
@@ -416,26 +382,6 @@ mod btreemaptest {
         hash_io.put(&a).unwrap();
         let a_2 = hash_io.get(&hash).unwrap();
         assert_eq!(a, a_2);
-    }
-}
-
-impl<T> Writable for Vec<T>
-    where T: Writable, T: Hashable {
-    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
-        try!(write_u32(0, write));
-        try!(write_u32(self.len() as u32, write));
-        let mut size: usize = 0;
-        for value in self {
-            size += try!(write_hash(&value.as_hash(), write));
-        }
-        Ok(size)
-    }
-}
-
-impl<T> Hashable for Vec<T>
-    where Vec<T>: Writable {
-    fn as_hash(&self) -> Hash {
-        self.writable_to_hash()
     }
 }
 

@@ -30,6 +30,8 @@ use std::fs::rename;
 #[derive(Debug)]
 pub enum HashIOError {
     Undefined(String),
+    VersionError(u32),
+    TypeError(Hash),
     IOError(io::Error),
     ParseError(Box<error::Error>)
 }
@@ -40,6 +42,8 @@ impl fmt::Display for HashIOError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             HashIOError::Undefined(ref msg) => write!(f, "Undefined error: {}", msg),
+            HashIOError::VersionError(version) => write!(f, "Unsupported version: {}", version),
+            HashIOError::TypeError(ref hash) => write!(f, "Unexpected type: {}", hash.as_string()),
             HashIOError::IOError(ref err) => err.fmt(f),
             HashIOError::ParseError(ref err) => write!(f, "Parse error: {}", err)
         }
@@ -50,6 +54,8 @@ impl error::Error for HashIOError {
     fn description(&self) -> &str {
         match *self {
             HashIOError::Undefined(ref msg) => msg,
+            HashIOError::VersionError(_) => "Unsupported version",
+            HashIOError::TypeError(_) => "Unexpected type",
             HashIOError::IOError(ref err) => err.description(),
             HashIOError::ParseError(ref err) => err.description()
         }

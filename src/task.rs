@@ -1,48 +1,117 @@
 //! Task management library
+//!
+//! This is the core tbd library.  Features are:
+//! * Adding tasks with a deadline
+//! * Adding pooled task which are randomly picked.
+//! * Mark task as completed.
+//!
+//! # Examples
+//! ```
+//! extern crate tbd;
+//! use tbd::task::*;
+//!
+//! fn main() {
+//!     // Create main task management object
+//!     let mut task_stat = TaskStat::empty_task_stat();
+//!
+//!     // Add an active task
+//!     task_stat.add_active_task(
+//!         // Task title
+//!         "A task".to_string(),
+//!         // More detailed task description
+//!         "A more detailed description of the task".to_string(),
+//!         // Importance factor
+//!         1.0,
+//!         // Task deadline is in three days
+//!         3
+//!     );
+//!
+//!     // Add a pooled task
+//!     task_stat.add_pooled_task(
+//!         // Task title
+//!         "Pooled task".to_string(),
+//!         // A more detailed description
+//!         "A description for the pooled task".to_string(),
+//!         // Importance factor
+//!         1.0,
+//!         // Propability the task is picked (0 = never, 1 = always)
+//!         0.5,
+//!         // Never pick this task three days until it's finished
+//!         3,
+//!         // Have five days to complete the task after it was picked
+//!         5
+//!     );
+//!
+//!     // Should have the first task as active task
+//!     assert_eq!("A task", task_stat.all_actives().unwrap()[0].task.title);
+//!     // Should also have the second task as pooled task
+//!     assert_eq!("Pooled task", task_stat.all_pooled().unwrap()[0].task.title);
+//!
+//!     // Mark the active task as completed
+//!     assert_eq!(true, task_stat.mark_done("A task".to_string()).is_ok());
+//!     // Method returns false if task was not found
+//!     assert_eq!(false, task_stat.mark_done("Foo".to_string()).is_ok());
+//!     // "A task" is now removed
+//!     assert_eq!(false, task_stat.mark_done("A task".to_string()).is_ok());
+//!
+//!     // Active tasks should be empty now
+//!     assert_eq!(0, task_stat.all_actives().unwrap().len());
+//! }
+//! ```
+
 //#![warn(missing_docs)]
 
 extern crate time;
 extern crate rand;
 
-use self::time::Duration;
+use self::time::{Duration, Tm};
 use std::collections::BTreeMap;
-
-pub type FactorT = f32;
-pub type CooldownT = i16;
-pub type DueDaysT = i16;
+use io::*;
+use hashio::*;
+use std::io;
+use hash::*;
+use std::io::{Read, Write};
+use std::error;
+use std::fmt;
 
 /// Base task type
-#[derive(Clone)]
-pub struct Task {
-    pub title: String,
-    pub description: String,
-    pub factor: FactorT
-}
+tbd_model!(Task, [
+        [factor: f32, write_f32, read_f32]
+    ], [
+        [title: String],
+        [description: String]
+    ]);
+
+
 
 /// A task which got activated.
-#[derive(Clone)]
-pub struct ActiveTask {
-    pub task: Task,
-    pub start: time::Tm,
-    pub due: time::Tm
-}
+tbd_model!(ActiveTask, [
+        [start: Tm, write_tm, read_tm],
+        [due: Tm, write_tm, read_tm]
+    ], [
+        [task: Task]
+    ]);
+
 
 /// A task which is about to get activated
-#[derive(Clone)]
-pub struct PooledTask {
-    pub task: Task,
-    pub propability: FactorT,
-    pub cool_down: CooldownT,
-    pub due_days: DueDaysT,
-    pub cooling_until: time::Tm
-}
+tbd_model!(PooledTask, [
+        [propability: f32, write_f32, read_f32],
+        [cool_down: i16, write_i16, read_i16],
+        [due_days: i16, write_i16, read_i16],
+        [cooling_until: Tm, write_tm, read_tm]
+    ], [
+        [task: Task]
+    ]);
+
+
 
 /// Overall state of the tasks
-pub struct TaskStat {
-    pub active: BTreeMap<String, ActiveTask>,
-    pub pool: BTreeMap<String, PooledTask>,
-    pub ref_tm: time::Tm,
-}
+tbd_model!(TaskStat, [
+        [ref_tm: Tm, write_tm, read_tm]
+    ], [
+        [active: BTreeMap<String, ActiveTask>],
+        [pool: BTreeMap<String, PooledTask>]
+    ]);
 
 
 
@@ -59,15 +128,17 @@ impl ActiveTask {
 }
 
 pub trait TaskStatTrait {
+    type Error: error::Error;
+
     fn add_active_task(&mut self, title: String, description: String,
-                       factor: FactorT, due_days: i16) -> ActiveTask;
+                       factor: f32, due_days: i16) -> Result<ActiveTask, Self::Error>;
     fn add_pooled_task(&mut self, title: String, description: String,
-                       factor: FactorT, propability: FactorT,
-                       cool_down: CooldownT, due_days: DueDaysT) -> PooledTask;
-    fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Vec<ActiveTask>;
-    fn mark_done(&mut self, title: String) -> bool;
-    fn all_actives(&self) -> Vec<ActiveTask>;
-    fn all_pooled(&self) -> Vec<PooledTask>;
+                       factor: f32, propability: f32,
+                       cool_down: i16, due_days: i16) -> Result<PooledTask, Self::Error>;
+    fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Result<Vec<ActiveTask>, Self::Error>;
+    fn mark_done(&mut self, title: String) -> Result<ActiveTask, Self::Error>;
+    fn all_actives(&self) -> Result<Vec<ActiveTask>, Self::Error>;
+    fn all_pooled(&self) -> Result<Vec<PooledTask>, Self::Error>;
 }
 
 /// Floor to the day if tm and remove time zone information
@@ -94,6 +165,10 @@ impl TaskStat {
             pool: BTreeMap::new(),
             ref_tm: time::now()
         }
+    }
+
+    pub fn update_ref_tm(&mut self) {
+        self.ref_tm = time::now();
     }
 
 
@@ -157,8 +232,32 @@ impl TaskStat {
     }
 }
 
+#[derive(Debug)]
+pub enum TaskStatError {
+    TaskNotFound(String)
+}
+
+impl fmt::Display for TaskStatError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TaskStatError::TaskNotFound(ref title) =>
+                write!(f, "Task not found: {}", title)
+        }
+    }
+}
+
+impl error::Error for TaskStatError {
+    fn description(&self) -> &str {
+        match *self {
+            TaskStatError::TaskNotFound(_) => "TaskNotFound"
+        }
+    }
+}
+
 impl TaskStatTrait for TaskStat {
-    fn activate<R: rand::Rng>(&mut self, r: &mut R) -> Vec<ActiveTask>{
+    type Error = TaskStatError;
+
+    fn activate<R: rand::Rng>(&mut self, r: &mut R) -> Result<Vec<ActiveTask>, Self::Error> {
         let mut insert_tasks = Vec::new();
         let mut result : Vec<ActiveTask> = Vec::new();
         {
@@ -172,15 +271,15 @@ impl TaskStatTrait for TaskStat {
         for p_task in insert_tasks {
             result.push(self.activate_p_task(&p_task));
         }
-        result
+        Ok(result)
     }
 
     /// Generate a new task and add it to the active list
     fn add_active_task(&mut self,
                            title: String,
                            description: String,
-                           factor: FactorT,
-                           due_days: i16) -> ActiveTask {
+                           factor: f32,
+                           due_days: i16) -> Result<ActiveTask, Self::Error> {
         floor_tm_day(&mut self.ref_tm);
         let duration = Duration::days(due_days as i64);
         let due = self.ref_tm + duration;
@@ -194,12 +293,12 @@ impl TaskStatTrait for TaskStat {
             due: due
         };
         self.active.insert(a_task.task.title.clone(), a_task.clone());
-        a_task
+        Ok(a_task)
     }
 
     fn add_pooled_task(&mut self, title: String, description: String,
-                       factor: FactorT, propability: FactorT,
-                       cool_down: CooldownT, due_days: DueDaysT) -> PooledTask {
+                       factor: f32, propability: f32,
+                       cool_down: i16, due_days: i16) -> Result<PooledTask, Self::Error> {
         floor_tm_day(&mut self.ref_tm);
         let p_task = PooledTask {
             task: Task {
@@ -213,33 +312,33 @@ impl TaskStatTrait for TaskStat {
             cooling_until: self.ref_tm
         };
         self.pool.insert(p_task.task.title.clone(), p_task.clone());
-        p_task
+        Ok(p_task)
     }
 
-    fn mark_done(&mut self, title: String) -> bool {
-        if !self.active.contains_key(&title) {
-            false
-        } else {
-            self.active.remove(&title);
-            self.renew_p_task(&title);
-            true
+    fn mark_done(&mut self, title: String) -> Result<ActiveTask, Self::Error> {
+        match self.active.remove(&title) {
+            None => Err(TaskStatError::TaskNotFound(title)),
+            Some(a_task) => {
+                self.renew_p_task(&title);
+                Ok(a_task)
+            }
         }
     }
 
-    fn all_actives(&self) -> Vec<ActiveTask> {
+    fn all_actives(&self) -> Result<Vec<ActiveTask>, Self::Error> {
         let mut res: Vec<ActiveTask> = Vec::new();
         for (_, a_task) in self.active.iter() {
             res.push(a_task.clone());
         }
-        res
+        Ok(res)
     }
 
-    fn all_pooled(&self)  -> Vec<PooledTask> {
+    fn all_pooled(&self)  -> Result<Vec<PooledTask>, Self::Error> {
         let mut res: Vec<PooledTask> = Vec::new();
         for (_, a_task) in self.pool.iter() {
             res.push(a_task.clone());
         }
-        res
+        Ok(res)
     }
 }
 
@@ -290,9 +389,9 @@ mod tests {
     #[test]
     fn basic_insert_test() {
         let mut task_stat = TaskStat::empty_task_stat();
-        task_stat.add_active_task("u".to_string(), "uiae".to_string(), 1.0, 3);
+        task_stat.add_active_task("u".to_string(), "uiae".to_string(), 1.0, 3).unwrap();
         task_stat.add_pooled_task("i".to_string(), "xvlc".to_string(), 1.0, 0.4,
-                                  3, 4);
+                                  3, 4).unwrap();
 
         assert_eq!(1, task_stat.active.len());
         assert_eq!(1, task_stat.pool.len());
@@ -312,12 +411,12 @@ mod tests {
         let mut rng = default_rng();
         let mut task_stat = TaskStat::empty_task_stat();
         task_stat.add_pooled_task("task a".to_string(), "".to_string(),
-                                  1.0, 0.2, 1, 2);
+                                  1.0, 0.2, 1, 2).unwrap();
         task_stat.add_pooled_task("task b".to_string(), "".to_string(),
-                                  1.0, 0.1, 2, 3);
+                                  1.0, 0.1, 2, 3).unwrap();
         task_stat.add_pooled_task("task c".to_string(), "".to_string(),
-                                  1.0, 0.7, 0, 1);
-        task_stat.activate(&mut rng);
+                                  1.0, 0.7, 0, 1).unwrap();
+        task_stat.activate(&mut rng).unwrap();
         let actives : BTreeMap<String, ActiveTask> = task_stat.active;
         assert_eq!(true, actives.contains_key(&"task a".to_string()));
         assert_eq!(false, actives.contains_key(&"task b".to_string()));
@@ -329,11 +428,11 @@ mod tests {
     fn mark_done_test () {
         let mut task_stat = TaskStat::empty_task_stat();
         task_stat.add_pooled_task("task a".to_string(), "".to_string(),
-                                  1.0, 0.2, 1, 2);
+                                  1.0, 0.2, 1, 2).unwrap();
         task_stat.add_active_task("task a".to_string(), "".to_string(),
-                                  1.0, 3);
-        assert_eq!(false, task_stat.mark_done("task b".to_string()));
-        assert_eq!(true, task_stat.mark_done("task a".to_string()));
-        assert_eq!(false, task_stat.mark_done("task b".to_string()));
+                                  1.0, 3).unwrap();
+        assert_eq!(false, task_stat.mark_done("task b".to_string()).is_ok());
+        assert_eq!(true, task_stat.mark_done("task a".to_string()).is_ok());
+        assert_eq!(false, task_stat.mark_done("task b".to_string()).is_ok());
     }
 }

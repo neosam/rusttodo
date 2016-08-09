@@ -72,7 +72,13 @@ pub struct HashIO {
     pub base_path: String
 }
 
-pub trait HashIOImpl<T: Hashable> {
+pub trait Typeable {
+    fn type_hash() -> Hash;
+}
+
+pub trait Hashtype : Hashable + Typeable {}
+
+pub trait HashIOImpl<T> where T: Hashtype {
     fn receive_hashable<R>(&self, read: &mut R) -> Result<T, HashIOError>
         where R: Read;
     fn store_hashable<W>(&self, hashable: &T, write: &mut W) -> Result<(), HashIOError>
@@ -109,7 +115,7 @@ impl HashIO {
 
     pub fn get<T>(&self, hash: &Hash) -> Result<T, HashIOError>
                 where HashIO: HashIOImpl<T>,
-                      T: Hashable {
+                      T: Hashtype {
         let filename = self.filename_for_hash(hash);
         let mut read = try!(File::open(filename));
         let result : T = try!(self.receive_hashable(&mut read));
@@ -118,7 +124,7 @@ impl HashIO {
 
     pub fn put<T>(&self, hashable: &T) -> Result<(), HashIOError>
                 where HashIO: HashIOImpl<T>,
-                      T: Hashable {
+                      T: Hashtype {
         let hash = hashable.as_hash();
 
         // First, if the entry already exists, skip the insert because it's already saved.
@@ -147,6 +153,14 @@ impl HashIO {
 }
 
 
+impl Typeable for String {
+    fn type_hash() -> Hash {
+        let id = String::from("String");
+        let id_bytes = id.as_bytes();
+        Hash::hash_bytes(id_bytes)
+    }
+}
+impl Hashtype for String {}
 
 impl HashIOImpl<String> for HashIO {
     fn store_hashable<W>(&self, hashable: &String, write: &mut W) -> Result<(), HashIOError>
@@ -162,6 +176,8 @@ impl HashIOImpl<String> for HashIO {
         let res = try!(String::from_utf8(bytes).map_err(|x| HashIOError::ParseError(Box::new(x))));
         Ok(res)
     }
+
+
 }
 
 
@@ -172,12 +188,37 @@ impl HashIOImpl<String> for HashIO {
 macro_rules! tbd_model {
     ($model_name:ident,
             [ $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),* ] ,
-            [ $( [$hash_name:ident : $hash_type:ty] ),* ]) => {
+            [ $( [$hash_name:ident : $hash_type:ident
+                    $(
+                        <$($anno_type:ty),+>
+                     )*]
+               ),* ]) => {
 
         #[derive(Debug, Clone, PartialEq)]
         pub struct $model_name {
             $(pub $attr_name: $attr_type,)*
-            $(pub $hash_name: $hash_type),*
+            $(pub $hash_name: $hash_type $(<$($anno_type),+>)*),*
+        }
+
+        impl Typeable for $model_name {
+            fn type_hash() -> Hash {
+                let mut byte_gen: Vec<u8> = Vec::new();
+                $(
+                    {
+                        let type_string = stringify!($attr_type);
+                        let type_bytes = type_string.as_bytes();
+                        let type_hash = Hash::hash_bytes(type_bytes);
+                        byte_gen.extend_from_slice(&*type_hash.get_bytes());
+                    };
+                )*
+                $(
+                    {
+                        let type_hash: Hash = $hash_type$(::<$($anno_type),+>)*::type_hash();
+                        byte_gen.extend_from_slice(&*type_hash.get_bytes());
+                    };
+                )*
+                Hash::hash_bytes(byte_gen.as_slice())
+            }
         }
 
         impl Writable for $model_name {
@@ -194,6 +235,8 @@ macro_rules! tbd_model {
         }
 
         hashable_for_writable!($model_name);
+
+        impl Hashtype for $model_name {}
 
         impl HashIOImpl<$model_name> for HashIO {
             fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError>
@@ -243,6 +286,13 @@ mod test {
     }
 
     hashable_for_debug!(A);
+
+    impl Typeable for A {
+        fn type_hash() -> Hash {
+            Hash::hash_string("A".to_string())
+        }
+    }
+    impl Hashtype for A {}
 
     impl HashIOImpl<A> for HashIO {
         fn receive_hashable<R>(&self, read: &mut R) -> Result<A, HashIOError>
@@ -333,11 +383,29 @@ mod test2 {
     }
 }
 
+
+impl<T, U> Typeable for BTreeMap<T, U>
+    where T: Hashtype, U: Hashtype,
+          T: Ord {
+
+    fn type_hash() -> Hash {
+        let mut byte_gen: Vec<u8> = Vec::new();
+        let id = String::from("BTreeMap");
+        let id_bytes = id.as_bytes();
+        byte_gen.extend_from_slice(&*Hash::hash_bytes(id_bytes).get_bytes());
+        byte_gen.extend_from_slice(&*T::type_hash().get_bytes());
+        byte_gen.extend_from_slice(&*U::type_hash().get_bytes());
+        Hash::hash_bytes(byte_gen.as_slice())
+    }
+}
+impl<T: Hashtype + Writable + Ord,
+     U: Hashtype + Writable> Hashtype for BTreeMap<T, U> {}
+
 impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
     where HashIO: HashIOImpl<T>,
           HashIO: HashIOImpl<U>,
           T: Writable, U: Writable,
-          T: Hashable, U: Hashable,
+          T: Hashtype, U: Hashtype,
           T: Ord {
     fn store_hashable<W>(&self, hashable: &BTreeMap<T, U>, write: &mut W) -> Result<(), HashIOError>
         where W: Write {
@@ -363,6 +431,7 @@ impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
         }
         Ok(res)
     }
+
 }
 
 #[cfg(test)]
@@ -391,9 +460,23 @@ mod btreemaptest {
     }
 }
 
+impl<T> Typeable for Vec<T>
+    where T: Hashable, T: Typeable {
+
+    fn type_hash() -> Hash {
+        let mut byte_gen: Vec<u8> = Vec::new();
+        let id = String::from("Vec");
+        let id_bytes = id.as_bytes();
+        byte_gen.extend_from_slice(&*Hash::hash_bytes(id_bytes).get_bytes());
+        byte_gen.extend_from_slice(&*T::type_hash().get_bytes());
+        Hash::hash_bytes(byte_gen.as_slice())
+    }
+}
+impl<T: Hashable + Typeable + Writable> Hashtype for Vec<T> {}
+
 impl<T> HashIOImpl<Vec<T>> for HashIO
     where HashIO: HashIOImpl<T>,
-          T: Writable, T: Hashable {
+          T: Writable, T: Hashtype {
     fn store_hashable<W>(&self, hashable: &Vec<T>, write: &mut W) -> Result<(), HashIOError>
         where W: Write {
         for value in hashable {
@@ -415,4 +498,6 @@ impl<T> HashIOImpl<Vec<T>> for HashIO
         }
         Ok(res)
     }
+
+
 }

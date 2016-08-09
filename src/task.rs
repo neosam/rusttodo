@@ -103,14 +103,12 @@ tbd_model!(PooledTask, [
         [task: Task]
     ]);
 
-
-
 /// Overall state of the tasks
 tbd_model!(TaskStat, [
         [ref_tm: Tm, write_tm, read_tm]
     ], [
-        [active: BTreeMap<String, ActiveTask>],
-        [pool: BTreeMap<String, PooledTask>]
+        [active: BTreeMap <String, ActiveTask>],
+        [pool: BTreeMap <String, PooledTask>]
     ]);
 
 

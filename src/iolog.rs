@@ -16,14 +16,14 @@ impl From<HashIOError> for LogError {
 }
 
 pub struct IOLogItem<T>
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     parent_hash: Hash,
     item: T
 }
 
 impl<T> Writable for IOLogItem<T>
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
         let mut size = 0;
@@ -34,15 +34,31 @@ impl<T> Writable for IOLogItem<T>
     }
 }
 impl<T> Hashable for IOLogItem<T>
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     fn as_hash(&self) -> Hash {
         self.writable_to_hash()
     }
 }
 
+impl<T> Typeable for IOLogItem<T>
+        where T: Hashtype,
+              HashIO: HashIOImpl<T> {
+    fn type_hash() -> Hash {
+        let mut byte_gen: Vec<u8> = Vec::new();
+        let id = String::from("IOLogItem");
+        let id_bytes = id.as_bytes();
+        byte_gen.extend_from_slice(&*Hash::hash_bytes(id_bytes).get_bytes());
+        byte_gen.extend_from_slice(&*T::type_hash().get_bytes());
+        Hash::hash_bytes(byte_gen.as_slice())
+    }
+}
+impl<T> Hashtype for IOLogItem<T>
+        where T: Hashtype,
+              HashIO: HashIOImpl<T> {}
+
 impl<T> HashIOImpl<IOLogItem<T>> for HashIO
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     fn receive_hashable<R>(&self, read: &mut R) -> Result<IOLogItem<T>, HashIOError>
             where R: Read {
@@ -68,17 +84,19 @@ impl<T> HashIOImpl<IOLogItem<T>> for HashIO
         try!(hashable.write_to(write));
         Ok(())
     }
+
+
 }
 
 pub struct IOLog<T>
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     pub head: Option<IOLogItem<T>>,
     pub hashio: HashIO
 }
 
 impl<T> IOLog<T>
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     pub fn write_head(&self) -> Result<(), io::Error> {
         if self.head.is_some() {
@@ -97,7 +115,7 @@ impl<T> IOLog<T>
 }
 
 impl<T> Log for IOLog<T>
-        where T: Hashable,
+        where T: Hashtype,
               HashIO: HashIOImpl<T> {
     type Item = T;
 
@@ -173,7 +191,7 @@ impl<T> Log for IOLog<T>
 }
 
 impl<T> IOLog<T>
-        where T: Hashable,
+        where T: Hashtype,
             HashIO: HashIOImpl<T> {
     pub fn new(path: String) -> IOLog<T> {
         let hashio = HashIO::new(path.clone());

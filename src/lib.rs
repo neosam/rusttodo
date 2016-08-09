@@ -1,4 +1,7 @@
 //! Task management library to successfully complete tasks
+
+//#![feature (log_syntax, trace_macros)]
+
 #[macro_use]
 pub mod hash;
 #[macro_use]

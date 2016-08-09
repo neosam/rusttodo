@@ -105,6 +105,17 @@ impl Writable for TaskAction {
 
 hashable_for_writable!(TaskAction);
 
+impl Typeable for TaskAction {
+    fn type_hash() -> Hash {
+        let mut byte_gen: Vec<u8> = Vec::new();
+        let id = String::from("TaskAction");
+        let id_bytes = id.as_bytes();
+        byte_gen.extend_from_slice(&*Hash::hash_bytes(id_bytes).get_bytes());
+        Hash::hash_bytes(byte_gen.as_slice())
+    }
+}
+impl Hashtype for TaskAction {}
+
 impl HashIOImpl<TaskAction> for HashIO {
     fn store_hashable<W>(&self, hashable: &TaskAction, write: &mut W) -> Result<(), HashIOError>
                     where W: Write {

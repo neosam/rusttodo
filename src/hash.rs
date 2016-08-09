@@ -98,6 +98,11 @@ impl Hash {
         Hash::Sha3(res)
     }
 
+    pub fn hash_string(str: String) -> Hash {
+        let bytes = str.as_bytes();
+        Hash::hash_bytes(bytes)
+    }
+
     /// Returns a sha3-256 hash of the byte array.
     pub fn hash_bytes(bytes: &[u8]) -> Hash {
         let mut sha3 = Sha3::sha3_256();

@@ -240,7 +240,7 @@ macro_rules! tbd_model_1 {
 #[cfg(test)]
 mod test {
     use super::super::hash::*;
-    use super::super::hashio::*;
+    use super::super::hashio_1::*;
     use super::super::io::*;
     use std::io::{Read, Write};
 
@@ -297,7 +297,7 @@ mod test {
 #[cfg(test)]
 mod test2 {
     use super::super::hash::*;
-    use super::super::hashio::*;
+    use super::super::hashio_1::*;
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;
@@ -398,7 +398,7 @@ impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
 #[cfg(test)]
 mod btreemaptest {
     use super::super::hash::*;
-    use super::super::hashio::*;
+    use super::super::hashio_1::*;
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;

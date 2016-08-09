@@ -224,7 +224,8 @@ macro_rules! tbd_model {
         impl Writable for $model_name {
             fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
                 let mut size = 0;
-                try!(write_u32(0, write));
+                try!(write_u32(1, write));
+                try!(write_hash(&$model_name::type_hash(), write));
                 size += $( try!($exp_fn(self.$attr_name, write)); )*
                 $(
                     try!(write_hash(&self.$hash_name.as_hash(), write));
@@ -241,7 +242,14 @@ macro_rules! tbd_model {
         impl HashIOImpl<$model_name> for HashIO {
             fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError>
                     where R: Read {
-                try!(read_u32(read));
+                let version = try!(read_u32(read));
+                if version < 1 {
+                    return Err(HashIOError::VersionError(version))
+                }
+                let type_hash = try!(read_hash(read));
+                if type_hash != $model_name::type_hash() {
+                    return Err(HashIOError::TypeError(type_hash))
+                }
                 $( let $attr_name = try!($imp_fn(read)); )* ;
                 $(
                     let $hash_name;

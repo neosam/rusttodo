@@ -30,7 +30,7 @@ use std::fs::rename;
 
 
 #[derive(Debug)]
-pub enum HashIOError {
+pub enum HashIOError1 {
     Undefined(String),
     IOError(io::Error),
     ParseError(Box<error::Error>)
@@ -38,50 +38,50 @@ pub enum HashIOError {
 
 
 
-impl fmt::Display for HashIOError {
+impl fmt::Display for HashIOError1 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            HashIOError::Undefined(ref msg) => write!(f, "Undefined error: {}", msg),
-            HashIOError::IOError(ref err) => err.fmt(f),
-            HashIOError::ParseError(ref err) => write!(f, "Parse error: {}", err)
+            HashIOError1::Undefined(ref msg) => write!(f, "Undefined error: {}", msg),
+            HashIOError1::IOError(ref err) => err.fmt(f),
+            HashIOError1::ParseError(ref err) => write!(f, "Parse error: {}", err)
         }
     }
 }
 
-impl error::Error for HashIOError {
+impl error::Error for HashIOError1 {
     fn description(&self) -> &str {
         match *self {
-            HashIOError::Undefined(ref msg) => msg,
-            HashIOError::IOError(ref err) => err.description(),
-            HashIOError::ParseError(ref err) => err.description()
+            HashIOError1::Undefined(ref msg) => msg,
+            HashIOError1::IOError(ref err) => err.description(),
+            HashIOError1::ParseError(ref err) => err.description()
         }
     }
 }
 
-impl From<io::Error> for HashIOError {
-    fn from(err: io::Error) -> HashIOError {
-        HashIOError::IOError(err)
+impl From<io::Error> for HashIOError1 {
+    fn from(err: io::Error) -> HashIOError1 {
+        HashIOError1::IOError(err)
     }
 }
 
-pub struct HashIO {
+pub struct HashIO1 {
     pub base_path: String
 }
 
-pub trait HashIOImpl<T: Hashable> {
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<T, HashIOError>
+pub trait HashIOImpl1<T: Hashable> {
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<T, HashIOError1>
         where R: Read;
-    fn store_hashable<W>(&self, hashable: &T, write: &mut W) -> Result<(), HashIOError>
+    fn store_hashable<W>(&self, hashable: &T, write: &mut W) -> Result<(), HashIOError1>
         where W: Write;
 
-    fn store_childs(&self, _: &T) -> Result<(), HashIOError> {
+    fn store_childs(&self, _: &T) -> Result<(), HashIOError1> {
         Ok(())
     }
 }
 
-impl HashIO {
-    pub fn new(path: String) -> HashIO {
-        HashIO {
+impl HashIO1 {
+    pub fn new(path: String) -> HashIO1 {
+        HashIO1 {
             base_path: path
         }
     }
@@ -103,8 +103,8 @@ impl HashIO {
         result
     }
 
-    pub fn get<T>(&self, hash: &Hash) -> Result<T, HashIOError>
-                where HashIO: HashIOImpl<T>,
+    pub fn get<T>(&self, hash: &Hash) -> Result<T, HashIOError1>
+                where HashIO1: HashIOImpl1<T>,
                       T: Hashable {
         let filename = self.filename_for_hash(hash);
         let mut read = try!(File::open(filename));
@@ -112,8 +112,8 @@ impl HashIO {
         Ok(result)
     }
 
-    pub fn put<T>(&self, hashable: &T) -> Result<(), HashIOError>
-                where HashIO: HashIOImpl<T>,
+    pub fn put<T>(&self, hashable: &T) -> Result<(), HashIOError1>
+                where HashIO1: HashIOImpl1<T>,
                       T: Hashable {
         let hash = hashable.as_hash();
 
@@ -156,18 +156,18 @@ impl Writable for String {
 }
 hashable_for_writable!(String);
 
-impl HashIOImpl<String> for HashIO {
-    fn store_hashable<W>(&self, hashable: &String, write: &mut W) -> Result<(), HashIOError>
+impl HashIOImpl1<String> for HashIO1 {
+    fn store_hashable<W>(&self, hashable: &String, write: &mut W) -> Result<(), HashIOError1>
                     where W: Write {
         try!(hashable.write_to(write));
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<String, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<String, HashIOError1>
                     where R: Read {
         let len = try!(read_u32(read));
         let bytes = try!(read_bytes(read, len as usize));
-        let res = try!(String::from_utf8(bytes).map_err(|x| HashIOError::ParseError(Box::new(x))));
+        let res = try!(String::from_utf8(bytes).map_err(|x| HashIOError1::ParseError(Box::new(x))));
         Ok(res)
     }
 }
@@ -203,8 +203,8 @@ macro_rules! tbd_model_1 {
 
         hashable_for_writable!($model_name);
 
-        impl HashIOImpl<$model_name> for HashIO {
-            fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError>
+        impl HashIOImpl1<$model_name> for HashIO1 {
+            fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError1>
                     where R: Read {
                 try!(read_u32(read));
                 $( let $attr_name = try!($imp_fn(read)); )* ;
@@ -221,12 +221,12 @@ macro_rules! tbd_model_1 {
                     })
             }
 
-            fn store_childs(&self, hashable: &$model_name) -> Result<(), HashIOError> {
+            fn store_childs(&self, hashable: &$model_name) -> Result<(), HashIOError1> {
                 $( try!(self.put(&hashable.$hash_name)); )*
                 Ok(())
             }
 
-            fn store_hashable<W>(&self, hashable: &$model_name, write: &mut W) -> Result<(), HashIOError>
+            fn store_hashable<W>(&self, hashable: &$model_name, write: &mut W) -> Result<(), HashIOError1>
                     where W: Write {
                 try!(hashable.write_to(write));
                 Ok(())
@@ -252,8 +252,8 @@ mod test {
 
     hashable_for_debug!(A);
 
-    impl HashIOImpl<A> for HashIO {
-        fn receive_hashable<R>(&self, read: &mut R) -> Result<A, HashIOError>
+    impl HashIOImpl1<A> for HashIO1 {
+        fn receive_hashable<R>(&self, read: &mut R) -> Result<A, HashIOError1>
                     where R: Read {
             let a = try!(read_u8(read));
             let b_hash = try!(read_hash(read));
@@ -261,11 +261,11 @@ mod test {
             Ok(A{a: a, b: b})
         }
 
-        fn store_childs(&self, hashable: &A) -> Result<(), HashIOError> {
+        fn store_childs(&self, hashable: &A) -> Result<(), HashIOError1> {
             self.put(&hashable.b)
         }
 
-        fn store_hashable<W>(&self, hashable: &A, write: &mut W) -> Result<(), HashIOError>
+        fn store_hashable<W>(&self, hashable: &A, write: &mut W) -> Result<(), HashIOError1>
                     where W: Write {
             try!(write_u8(hashable.a, write));
             try!(write_hash(&hashable.b.as_hash(), write));
@@ -275,7 +275,7 @@ mod test {
 
     #[test]
     fn simple_test() {
-        let hash_io = HashIO::new("savetest".to_string());
+        let hash_io = HashIO1::new("savetest".to_string());
         let a_hash;
         {
             let a = A {
@@ -298,6 +298,7 @@ mod test {
 mod test2 {
     use super::super::hash::*;
     use super::super::hashio_1::*;
+    use super::super::hashio_1;
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;
@@ -318,7 +319,7 @@ mod test2 {
 
     #[test]
     fn simple_test() {
-        let hash_io = HashIO::new("savetest".to_string());
+        let hash_io = HashIO1::new("savetest".to_string());
         let my_hash;
         let b = B {
             foo: "Foo".to_string(),
@@ -363,13 +364,13 @@ impl<T, U> Hashable for BTreeMap<T, U>
     }
 }
 
-impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
-    where HashIO: HashIOImpl<T>,
-          HashIO: HashIOImpl<U>,
+impl<T, U> HashIOImpl1<BTreeMap<T, U>> for HashIO1
+    where HashIO1: HashIOImpl1<T>,
+          HashIO1: HashIOImpl1<U>,
           T: Writable, U: Writable,
           T: Hashable, U: Hashable,
           T: Ord {
-    fn store_hashable<W>(&self, hashable: &BTreeMap<T, U>, write: &mut W) -> Result<(), HashIOError>
+    fn store_hashable<W>(&self, hashable: &BTreeMap<T, U>, write: &mut W) -> Result<(), HashIOError1>
         where W: Write {
         for (key, value) in hashable {
             try!(self.put(key));
@@ -379,7 +380,7 @@ impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<BTreeMap<T, U>, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<BTreeMap<T, U>, HashIOError1>
         where R: Read {
         let mut res = BTreeMap::<T, U>::new();
         try!(read_u32(read));
@@ -399,6 +400,7 @@ impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
 mod btreemaptest {
     use super::super::hash::*;
     use super::super::hashio_1::*;
+    use super::super::hashio_1;
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;
@@ -410,7 +412,7 @@ mod btreemaptest {
 
     #[test]
     fn test() {
-        let hash_io = HashIO::new("savetest/btreemaptest".to_string());
+        let hash_io = HashIO1::new("savetest/btreemaptest".to_string());
         let mut a = A { a: BTreeMap::new() };
         a.a.insert("one".to_string(), "1".to_string());
         a.a.insert("two".to_string(), "2".to_string());
@@ -441,10 +443,10 @@ impl<T> Hashable for Vec<T>
     }
 }
 
-impl<T> HashIOImpl<Vec<T>> for HashIO
-    where HashIO: HashIOImpl<T>,
+impl<T> HashIOImpl1<Vec<T>> for HashIO1
+    where HashIO1: HashIOImpl1<T>,
           T: Writable, T: Hashable {
-    fn store_hashable<W>(&self, hashable: &Vec<T>, write: &mut W) -> Result<(), HashIOError>
+    fn store_hashable<W>(&self, hashable: &Vec<T>, write: &mut W) -> Result<(), HashIOError1>
         where W: Write {
         for value in hashable {
             try!(self.put(value));
@@ -453,7 +455,7 @@ impl<T> HashIOImpl<Vec<T>> for HashIO
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<Vec<T>, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<Vec<T>, HashIOError1>
         where R: Read {
         let mut res = Vec::<T>::new();
         try!(read_u32(read));

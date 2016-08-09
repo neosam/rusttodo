@@ -509,3 +509,72 @@ impl<T> HashIOImpl<Vec<T>> for HashIO
 
 
 }
+
+
+#[cfg(test)]
+mod convert_test {
+    use super::super::hash::*;
+    use super::super::hashio::*;
+    use super::super::hashio_1::*;
+    use super::super::io::*;
+    use std::io::{Read, Write};
+    use std::io;
+
+    tbd_model_1!(A1, [], [
+        [x: String]]
+    );
+
+    tbd_model!(A, [], [
+        [x: String],
+        [y: String]]
+    );
+
+    impl From<A1> for A {
+        fn from(a1: A1) -> A {
+            A {
+                x: a1.x,
+                y: "".to_string()
+            }
+        }
+    }
+
+    fn save_hashio1() -> Hash {
+        let mut hash_io = HashIO1::new("./unittest/convert_test/".to_string());
+        let a = A1{x: "bla".to_string()};
+        let hash = a.as_hash();
+        hash_io.put(&a).unwrap();
+        hash
+    }
+
+    fn load_a(hash: &Hash) -> Option<A> {
+        let mut hash_io = HashIO::new("./unittest/convert_test/".to_string());
+        let mut hash_io1 = HashIO1::new("./unittest/convert_test/".to_string());
+        let res = hash_io.get::<A>(hash);
+        if res.is_ok() {
+            return Some(res.unwrap())
+        }
+        let res = hash_io1.get::<A1>(hash);
+        if res.is_ok() {
+            return Some(From::from(res.unwrap()))
+        }
+        None
+    }
+
+    fn save_a(a: &A) {
+        let mut hash_io = HashIO::new("./unittest/convert_test/".to_string());
+        hash_io.put(a).unwrap();
+    }
+
+    #[test]
+    fn main() {
+        let hash1 = save_hashio1();
+        let a = load_a(&hash1).unwrap();
+        assert_eq!("bla".to_string(), a.x);
+        assert_eq!("".to_string(), a.y);
+        let hash = a.as_hash();
+        save_a(&a);
+        let a_again = load_a(&hash).unwrap();
+        assert_eq!("bla".to_string(), a_again.x);
+        assert_eq!("".to_string(), a_again.y);
+    }
+}

@@ -129,7 +129,7 @@ impl HashIOImpl<TaskAction> for HashIO {
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<TaskAction, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<TaskAction, HashIOError>
                     where R: Read {
         let _  = try!(read_u32(read)); // version
         let action_type = try!(read_u8(read));

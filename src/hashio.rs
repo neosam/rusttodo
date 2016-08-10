@@ -79,7 +79,7 @@ pub trait Typeable {
 pub trait Hashtype : Hashable + Typeable {}
 
 pub trait HashIOImpl<T> where T: Hashtype {
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<T, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R, hash: &Hash) -> Result<T, HashIOError>
         where R: Read;
     fn store_hashable<W>(&self, hashable: &T, write: &mut W) -> Result<(), HashIOError>
         where W: Write;
@@ -118,7 +118,7 @@ impl HashIO {
                       T: Hashtype {
         let filename = self.filename_for_hash(hash);
         let mut read = try!(File::open(filename));
-        let result : T = try!(self.receive_hashable(&mut read));
+        let result : T = try!(self.receive_hashable(&mut read, hash));
         Ok(result)
     }
 
@@ -169,7 +169,7 @@ impl HashIOImpl<String> for HashIO {
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<String, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<String, HashIOError>
                     where R: Read {
         let len = try!(read_u32(read));
         let bytes = try!(read_bytes(read, len as usize));
@@ -240,7 +240,7 @@ macro_rules! tbd_model {
         impl Hashtype for $model_name {}
 
         impl HashIOImpl<$model_name> for HashIO {
-            fn receive_hashable<R>(&self, read: &mut R) -> Result<$model_name, HashIOError>
+            fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<$model_name, HashIOError>
                     where R: Read {
                 let version = try!(read_u32(read));
                 if version < 1 {
@@ -303,7 +303,7 @@ mod test {
     impl Hashtype for A {}
 
     impl HashIOImpl<A> for HashIO {
-        fn receive_hashable<R>(&self, read: &mut R) -> Result<A, HashIOError>
+        fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<A, HashIOError>
                     where R: Read {
             let a = try!(read_u8(read));
             let b_hash = try!(read_hash(read));
@@ -425,7 +425,7 @@ impl<T, U> HashIOImpl<BTreeMap<T, U>> for HashIO
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<BTreeMap<T, U>, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<BTreeMap<T, U>, HashIOError>
         where R: Read {
         let mut res = BTreeMap::<T, U>::new();
         try!(read_u32(read));
@@ -494,7 +494,7 @@ impl<T> HashIOImpl<Vec<T>> for HashIO
         Ok(())
     }
 
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<Vec<T>, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<Vec<T>, HashIOError>
         where R: Read {
         let mut res = Vec::<T>::new();
         try!(read_u32(read));

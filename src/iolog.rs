@@ -60,7 +60,7 @@ impl<T> Hashtype for IOLogItem<T>
 impl<T> HashIOImpl<IOLogItem<T>> for HashIO
         where T: Hashtype,
               HashIO: HashIOImpl<T> {
-    fn receive_hashable<R>(&self, read: &mut R) -> Result<IOLogItem<T>, HashIOError>
+    fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<IOLogItem<T>, HashIOError>
             where R: Read {
         let parent_hash = try!(read_hash(read));
         let item;

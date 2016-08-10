@@ -16,24 +16,32 @@ use std::io::{Read, Write};
 /// Use .get_ref to receive a read only reference and .get_mut to even get a mutable
 /// reference.  Use .put to override the data.
 ///
-/// HashIO will store the data if 
-#[derive(Clone, Debug)]
-struct LazyIO<T>
+/// HashIO will store the data if
+#[derive(Clone, Debug, PartialEq)]
+pub struct LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
     hash: Hash,
-    hash_io: HashIO,
+    hash_io: Option<HashIO>,
     t: Option<T>
 }
 
 impl<T> LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
-    pub fn new(hash: Hash, hash_io: HashIO) -> LazyIO<T> {
+    pub fn unloaded(hash: Hash, hash_io: HashIO) -> LazyIO<T> {
         LazyIO {
             hash: hash,
-            hash_io: hash_io,
+            hash_io: Some(hash_io),
             t: None
+        }
+    }
+
+    pub fn new(t: T) -> LazyIO<T> {
+        LazyIO {
+            hash: t.as_hash(),
+            hash_io: None,
+            t: Some(t)
         }
     }
 }
@@ -66,8 +74,9 @@ impl<T> HashIOImpl<LazyIO<T>> for HashIO
               HashIO: HashIOImpl<T> {
     fn receive_hashable<R>(&self, _: &mut R, hash: &Hash) -> Result<LazyIO<T>, HashIOError>
                 where R: Read {
-        Ok(LazyIO::new(hash.clone(), self.clone()))
+        Ok(LazyIO::unloaded(hash.clone(), self.clone()))
     }
+
     fn store_hashable<W>(&self, lazy_io: &LazyIO<T>, write: &mut W) -> Result<(), HashIOError>
                 where W: Write {
         match lazy_io.t {
@@ -91,7 +100,7 @@ impl<T> LazyIO<T>
     pub fn get_ref(&mut self) -> &Option<T> {
         let is_none = self.t.is_none();
         if is_none {
-            let res = self.hash_io.get(&self.hash).ok();
+            let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
             self.t = res;
         }
         &self.t
@@ -100,14 +109,57 @@ impl<T> LazyIO<T>
     pub fn get_mut(&mut self) -> &mut Option<T> {
         let is_none = self.t.is_none();
         if is_none {
-            let res = self.hash_io.get(&self.hash).ok();
+            let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
             self.t = res;
         }
         &mut self.t
     }
 
+    pub fn get(&mut self) -> Option<T> {
+        let is_none = self.t.is_none();
+        if is_none {
+            let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
+            self.t = res;
+        }
+        self.t.clone()
+    }
+
     pub fn put(&mut self, t: T) {
         self.t = Some(t)
     }
+
+    pub fn is_loaded(&self) -> bool {
+        self.t.is_some()
+    }
 }
 
+#[cfg(test)]
+mod test {
+    use super::super::lazyio::*;
+    use super::super::hash::*;
+    use super::super::hashio::*;
+    use super::super::io::*;
+    use std::io::{Read, Write};
+    use std::io;
+    use std::fs::remove_dir_all;
+
+    tbd_model!(A, [], [
+        [x: LazyIO<String>]
+    ]);
+
+    #[test]
+    fn test() {
+        remove_dir_all("unittest/lazytest").ok();
+
+        let hash_io = HashIO::new("unittest/lazytest".to_string());
+        let a = A { x: LazyIO::new("test".to_string()) };
+        let hash = a.as_hash();
+        hash_io.put(&a).unwrap();
+
+        let mut a_again: A = hash_io.get(&hash).unwrap();
+        assert_eq!(false, a_again.x.is_loaded());
+        let new_lazy = a_again.x.get().unwrap();
+        assert_eq!(true, a_again.x.is_loaded());
+        assert_eq!(&"test".to_string(), &new_lazy);
+    }
+}

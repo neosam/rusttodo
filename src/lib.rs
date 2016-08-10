@@ -10,6 +10,7 @@ pub mod io;
 pub mod hashio_1;
 #[macro_use]
 pub mod hashio;
+pub mod lazyio;
 pub mod log;
 pub mod iolog;
 pub mod task;

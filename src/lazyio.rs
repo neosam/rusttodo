@@ -2,6 +2,7 @@ use io::*;
 use hash::*;
 use hashio::*;
 use std::io::{Read, Write};
+use std::cell::{RefCell, Ref};
 
 /// Will only be loaded when required.
 ///
@@ -23,7 +24,7 @@ pub struct LazyIO<T>
               HashIO: HashIOImpl<T> {
     hash: Hash,
     hash_io: Option<HashIO>,
-    t: Option<T>
+    t: RefCell<Option<T>>
 }
 
 impl<T> LazyIO<T>
@@ -33,7 +34,7 @@ impl<T> LazyIO<T>
         LazyIO {
             hash: hash,
             hash_io: Some(hash_io),
-            t: None
+            t: RefCell::new(None)
         }
     }
 
@@ -41,7 +42,7 @@ impl<T> LazyIO<T>
         LazyIO {
             hash: t.as_hash(),
             hash_io: None,
-            t: Some(t)
+            t: RefCell::new(Some(t))
         }
     }
 }
@@ -50,7 +51,7 @@ impl<T> Hashable for LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
     fn as_hash(&self) -> Hash {
-        match self.t {
+        match *self.t.borrow() {
             None => self.hash,
             Some(ref t) => t.as_hash()
         }
@@ -79,7 +80,7 @@ impl<T> HashIOImpl<LazyIO<T>> for HashIO
 
     fn store_hashable<W>(&self, lazy_io: &LazyIO<T>, write: &mut W) -> Result<(), HashIOError>
                 where W: Write {
-        match lazy_io.t {
+        match *lazy_io.t.borrow() {
             // Don't store anything which is not yet loaded
             None => Ok(()),
             Some(ref t) =>  self.store_hashable(t, write)
@@ -87,7 +88,7 @@ impl<T> HashIOImpl<LazyIO<T>> for HashIO
     }
 
     fn store_childs(&self, lazy_io: &LazyIO<T>) -> Result<(), HashIOError> {
-        match lazy_io.t {
+        match *lazy_io.t.borrow() {
             None => Ok(()),
             Some(ref t) => self.store_childs(t)
         }
@@ -95,41 +96,24 @@ impl<T> HashIOImpl<LazyIO<T>> for HashIO
 }
 
 impl<T> LazyIO<T>
-        where T: Hashtype, T: Writable, T: Sized, T: Clone,
+        where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
-    pub fn get_ref(&mut self) -> &Option<T> {
-        let is_none = self.t.is_none();
-        if is_none {
-            let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
-            self.t = res;
-        }
-        &self.t
-    }
 
-    pub fn get_mut(&mut self) -> &mut Option<T> {
-        let is_none = self.t.is_none();
+    pub fn get_ref(&self) -> Ref<Option<T>> {
+        let is_none = self.t.borrow().is_none();
         if is_none {
             let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
-            self.t = res;
+            *self.t.borrow_mut() = res;
         }
-        &mut self.t
-    }
-
-    pub fn get(&mut self) -> Option<T> {
-        let is_none = self.t.is_none();
-        if is_none {
-            let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
-            self.t = res;
-        }
-        self.t.clone()
+        self.t.borrow()
     }
 
     pub fn put(&mut self, t: T) {
-        self.t = Some(t)
+        *self.t.borrow_mut() = Some(t)
     }
 
     pub fn is_loaded(&self) -> bool {
-        self.t.is_some()
+        self.t.borrow().is_some()
     }
 }
 
@@ -156,10 +140,11 @@ mod test {
         let hash = a.as_hash();
         hash_io.put(&a).unwrap();
 
-        let mut a_again: A = hash_io.get(&hash).unwrap();
+        let a_again: A = hash_io.get(&hash).unwrap();
         assert_eq!(false, a_again.x.is_loaded());
-        let new_lazy = a_again.x.get().unwrap();
+        let new_lazy_opt = a_again.x.get_ref();
+        let new_lazy = new_lazy_opt.as_ref().unwrap();
         assert_eq!(true, a_again.x.is_loaded());
-        assert_eq!(&"test".to_string(), &new_lazy);
+        assert_eq!(&"test".to_string(), new_lazy);
     }
 }

@@ -519,6 +519,7 @@ mod convert_test {
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;
+    use std::fs::remove_dir_all;
 
     tbd_model_1!(A1, [], [
         [x: String]]
@@ -539,7 +540,7 @@ mod convert_test {
     }
 
     fn save_hashio1() -> Hash {
-        let mut hash_io = HashIO1::new("./unittest/convert_test/".to_string());
+        let hash_io = HashIO1::new("./unittest/convert_test/".to_string());
         let a = A1{x: "bla".to_string()};
         let hash = a.as_hash();
         hash_io.put(&a).unwrap();
@@ -547,8 +548,8 @@ mod convert_test {
     }
 
     fn load_a(hash: &Hash) -> Option<A> {
-        let mut hash_io = HashIO::new("./unittest/convert_test/".to_string());
-        let mut hash_io1 = HashIO1::new("./unittest/convert_test/".to_string());
+        let hash_io = HashIO::new("./unittest/convert_test/".to_string());
+        let hash_io1 = HashIO1::new("./unittest/convert_test/".to_string());
         let res = hash_io.get::<A>(hash);
         if res.is_ok() {
             return Some(res.unwrap())
@@ -561,12 +562,13 @@ mod convert_test {
     }
 
     fn save_a(a: &A) {
-        let mut hash_io = HashIO::new("./unittest/convert_test/".to_string());
+        let hash_io = HashIO::new("./unittest/convert_test/".to_string());
         hash_io.put(a).unwrap();
     }
 
     #[test]
     fn main() {
+        remove_dir_all("./unittest/convert_test/").ok();
         let hash1 = save_hashio1();
         let a = load_a(&hash1).unwrap();
         assert_eq!("bla".to_string(), a.x);

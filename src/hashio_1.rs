@@ -298,7 +298,6 @@ mod test {
 mod test2 {
     use super::super::hash::*;
     use super::super::hashio_1::*;
-    use super::super::hashio_1;
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;
@@ -400,7 +399,6 @@ impl<T, U> HashIOImpl1<BTreeMap<T, U>> for HashIO1
 mod btreemaptest {
     use super::super::hash::*;
     use super::super::hashio_1::*;
-    use super::super::hashio_1;
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;

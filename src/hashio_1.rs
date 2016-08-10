@@ -275,7 +275,7 @@ mod test {
 
     #[test]
     fn simple_test() {
-        let hash_io = HashIO1::new("savetest".to_string());
+        let hash_io = HashIO1::new("unittest/savetest1".to_string());
         let a_hash;
         {
             let a = A {
@@ -318,7 +318,7 @@ mod test2 {
 
     #[test]
     fn simple_test() {
-        let hash_io = HashIO1::new("savetest".to_string());
+        let hash_io = HashIO1::new("unittest/savetest1".to_string());
         let my_hash;
         let b = B {
             foo: "Foo".to_string(),
@@ -410,7 +410,7 @@ mod btreemaptest {
 
     #[test]
     fn test() {
-        let hash_io = HashIO1::new("savetest/btreemaptest".to_string());
+        let hash_io = HashIO1::new("unittest/btreemaptest1".to_string());
         let mut a = A { a: BTreeMap::new() };
         a.a.insert("one".to_string(), "1".to_string());
         a.a.insert("two".to_string(), "2".to_string());

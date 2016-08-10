@@ -231,8 +231,8 @@ mod test {
 
     #[test]
     fn test() {
-        remove_dir_all("logtest").ok();
-        let mut log = IOLog::<A>::new("logtest".to_string());
+        remove_dir_all("unittest/logtest").ok();
+        let mut log = IOLog::<A>::new("unittest/logtest".to_string());
         // make sure the log is empty
         assert_eq!(None, log.head_hash());
 
@@ -243,18 +243,19 @@ mod test {
 
         print!("Hash written: {}\n", hash_one.as_string());
         print!("Hash written: {}\n", hash_two.as_string());
-        let one_ref: A = log.get(hash_one).ok().unwrap();
-        let two_ref: A = log.get(hash_two).ok().unwrap();
+        let one_ref: A = log.get(hash_one).unwrap();
+        let two_ref: A = log.get(hash_two).unwrap();
         assert_eq!(one, one_ref);
         assert_eq!(two, two_ref);
 
         // Verify if reloading works correcty
-        let log2 = IOLog::<A>::new("logtest".to_string());
-        let two_ref2: A = log.get(log2.head_hash().unwrap()).ok().unwrap();
+        println!("Verify reloading\n");
+        let log2 = IOLog::<A>::new("unittest/logtest".to_string());
+        let two_ref2: A = log.get(log2.head_hash().unwrap()).unwrap();
         assert_eq!(two, two_ref2);
 
-
-        let log3 = IOLog::<A>::new("logtest".to_string());
+        println!("Log3");
+        let log3 = IOLog::<A>::new("unittest/logtest".to_string());
         assert_eq!(Ok(Some(hash_one)), log3.parent_hash(hash_two));
 
         let mut hash_iter = LogIteratorHash::from_log(&log3);

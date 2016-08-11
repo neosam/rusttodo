@@ -2,7 +2,7 @@ use io::*;
 use hash::*;
 use hashio::*;
 use std::io::{Read, Write};
-use std::cell::{RefCell, Ref};
+use std::cell::{RefCell, Ref, RefMut};
 
 /// Will only be loaded when required.
 ///
@@ -99,13 +99,22 @@ impl<T> LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
 
-    pub fn get_ref(&self) -> Ref<Option<T>> {
+    pub fn load(&self) {
         let is_none = self.t.borrow().is_none();
         if is_none {
             let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
             *self.t.borrow_mut() = res;
         }
+    }
+
+    pub fn get_ref(&self) -> Ref<Option<T>> {
+        self.load();
         self.t.borrow()
+    }
+
+    pub fn get_mut(&mut self) -> RefMut<Option<T>> {
+        self.load();
+        self.t.borrow_mut()
     }
 
     pub fn put(&mut self, t: T) {
@@ -127,24 +136,71 @@ mod test {
     use std::io;
     use std::fs::remove_dir_all;
 
+    tbd_model!(B, [], [
+        [b: String]
+    ]);
+
     tbd_model!(A, [], [
-        [x: LazyIO<String>]
+        [a: LazyIO<B>]
     ]);
 
     #[test]
     fn test() {
+        print!("Clean files\n");
         remove_dir_all("unittest/lazytest").ok();
 
+        print!("Setting up...\n");
         let hash_io = HashIO::new("unittest/lazytest".to_string());
-        let a = A { x: LazyIO::new("test".to_string()) };
+        let b = B { b: "test".to_string() };
+        let a = A { a: LazyIO::new(b) };
         let hash = a.as_hash();
         hash_io.put(&a).unwrap();
 
-        let a_again: A = hash_io.get(&hash).unwrap();
-        assert_eq!(false, a_again.x.is_loaded());
-        let new_lazy_opt = a_again.x.get_ref();
-        let new_lazy = new_lazy_opt.as_ref().unwrap();
-        assert_eq!(true, a_again.x.is_loaded());
-        assert_eq!(&"test".to_string(), new_lazy);
+        let mut a_again: A = hash_io.get(&hash).unwrap();
+        print!("Hash should equal the one which reqested it\n");
+        assert_eq!(hash, a_again.as_hash());
+        // Access immutable
+        {
+            print!("Value should not yet be loaded\n");
+            assert_eq!(false, a_again.a.is_loaded());
+
+            print!("Get the reference, value will be loaded automatically\n");
+            let new_lazy_opt = a_again.a.get_ref();
+            let new_lazy = new_lazy_opt.as_ref().unwrap();
+
+            print!("Verify if value is loaded now\n");
+            assert_eq!(true, a_again.a.is_loaded());
+            print!("Vefify values\n");
+            assert_eq!("test".to_string(), new_lazy.b);
+
+            // immutable borrow goes out of scope here
+        }
+
+        print!("Hash should not have changed after value was loaded\n");
+        assert_eq!(hash, a_again.as_hash());
+
+        // Access mutable
+        {
+            print!("Load mutable ref\n");
+            let mut new_lazy_opt = a_again.a.get_mut();
+            let mut new_lazy = new_lazy_opt.as_mut().unwrap();
+
+            print!("Modify mutable ref\n");
+            new_lazy.b = "changed".to_string();
+
+            // mutable borrow goes out of scope here
+        }
+
+        print!("Hash should have changed\n");
+        let new_hash = a_again.as_hash();
+        assert_eq!(false, hash == new_hash);
+
+        print!("Saving again...\n");
+        hash_io.put(&a_again).unwrap();
+
+        print!("Reloading...\n");
+        let mut a_again: A = hash_io.get(&hash).unwrap();
+
+        
     }
 }

@@ -6,22 +6,9 @@ use std::cell::{RefCell, Ref, RefMut};
 use std::fmt;
 use std::error;
 
-/// Will only be loaded when required.
-///
-/// Stores a hash of a value and will run the HashIO loader
-/// when the get method was called.  Once loaded, it will be stored
-/// internally and can be modified.
-///
-/// It implements Hashable.  As long as the type is not loaded, the
-/// stored hash will be used.  When loaded, the real hash will be calcalated
-/// by calling the as_hash method of the stored object.
-///
-/// Use .get_ref to receive a read only reference and .get_mut to even get a mutable
-/// reference.  Use .put to override the data.
-///
-/// HashIO will store the data if
-///
 
+
+/// Default error type for LazyIO.
 #[derive(Debug)]
 pub enum LazyIOError {
     HashIOError(HashIOError),
@@ -55,6 +42,21 @@ impl From<HashIOError> for LazyIOError {
     }
 }
 
+
+/// Will only be loaded when required.
+///
+/// Stores a hash of a value and will run the HashIO loader
+/// when the get method was called.  Once loaded, it will be stored
+/// internally and can be modified.
+///
+/// It implements Hashable.  As long as the type is not loaded, the
+/// stored hash will be used.  When loaded, the real hash will be calcalated
+/// by calling the as_hash method of the stored object.
+///
+/// Use .get_ref to receive a read only reference and .get_mut to even get a mutable
+/// reference.  Use .put to override the data.
+///
+/// Unload the data with .unload if you want to save memory.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
@@ -64,9 +66,13 @@ pub struct LazyIO<T>
     t: RefCell<Option<T>>
 }
 
+
 impl<T> LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
+    /// Create a new LazyIO which contains a Hash and a HashIO to store data.
+    ///
+    /// It will load the data when requested.
     pub fn unloaded(hash: Hash, hash_io: HashIO) -> LazyIO<T> {
         LazyIO {
             hash: hash,
@@ -75,6 +81,9 @@ impl<T> LazyIO<T>
         }
     }
 
+    /// Create a new LazyIO initilized with a type.
+    ///
+    /// It will never lead any data since it doesn't have a HashIO.
     pub fn new(t: T) -> LazyIO<T> {
         LazyIO {
             hash: t.as_hash(),
@@ -136,6 +145,7 @@ impl<T> LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
 
+    /// Load the hash value if not yet done.
     pub fn load(&self) -> Result<(), LazyIOError> {
         let is_none = self.t.borrow().is_none();
         if is_none {
@@ -150,6 +160,7 @@ impl<T> LazyIO<T>
         Ok(())
     }
 
+    /// Borrow the value as immutable ref, it is loaded if required.
     pub fn get_ref(&self) -> Result<Ref<T>, LazyIOError> {
         try!(self.load());
         if self.is_loaded() {
@@ -159,6 +170,7 @@ impl<T> LazyIO<T>
         }
     }
 
+    /// Borrow the value as mutable ref, it is loaded if required.
     pub fn get_mut(&mut self) -> Result<RefMut<T>, LazyIOError> {
         try!(self.load());
         if self.is_loaded() {
@@ -168,22 +180,33 @@ impl<T> LazyIO<T>
         }
     }
 
+    /// Borrow the value as immutable ref.
+    ///
+    /// This method will panic if the value wasn't loaded.
     pub fn unwrap_ref(&self) -> Ref<T> {
         Ref::map(self.t.borrow(), | x | x.as_ref().unwrap())
     }
 
+    /// Borrow the value as mutable ref.
+    ///
+    /// This method will panic if the value wasn't loaded.
     pub fn unwrap_mut(&mut self) -> RefMut<T> {
         RefMut::map(self.t.borrow_mut(), | x | x.as_mut().unwrap())
     }
 
+    /// Overwrite the value.
     pub fn put(&mut self, t: T) {
         *self.t.borrow_mut() = Some(t)
     }
 
+    /// If the value was loaded and is available.
     pub fn is_loaded(&self) -> bool {
         self.t.borrow().is_some()
     }
 
+    /// Unloads the value.
+    ///
+    /// Out of scope values (hopefully) will free their memory.
     pub fn unload(&mut self) {
         *self.t.borrow_mut() = None;
     }

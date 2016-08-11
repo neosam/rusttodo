@@ -3,6 +3,8 @@ use hash::*;
 use hashio::*;
 use std::io::{Read, Write};
 use std::cell::{RefCell, Ref, RefMut};
+use std::fmt;
+use std::error;
 
 /// Will only be loaded when required.
 ///
@@ -18,6 +20,41 @@ use std::cell::{RefCell, Ref, RefMut};
 /// reference.  Use .put to override the data.
 ///
 /// HashIO will store the data if
+///
+
+#[derive(Debug)]
+pub enum LazyIOError {
+    HashIOError(HashIOError),
+    NoHashIOError,
+    UnloadedError
+}
+
+impl fmt::Display for LazyIOError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            LazyIOError::HashIOError(ref msg) => write!(f, "HashIOError error: {}", msg),
+            LazyIOError::NoHashIOError => write!(f, "No HashIO available to load"),
+            LazyIOError::UnloadedError => write!(f, "Value could not be loaded")
+        }
+    }
+}
+
+impl error::Error for LazyIOError {
+    fn description(&self) -> &str {
+        match *self {
+            LazyIOError::HashIOError(ref err) => err.description(),
+            LazyIOError::NoHashIOError => "No HashIO available to load",
+            LazyIOError::UnloadedError => "Value could not be loaded"
+        }
+    }
+}
+
+impl From<HashIOError> for LazyIOError {
+    fn from(err: HashIOError) -> LazyIOError {
+        LazyIOError::HashIOError(err)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
@@ -99,31 +136,43 @@ impl<T> LazyIO<T>
         where T: Hashtype, T: Writable, T: Sized,
               HashIO: HashIOImpl<T> {
 
-    pub fn load(&self) {
+    pub fn load(&self) -> Result<(), LazyIOError> {
         let is_none = self.t.borrow().is_none();
         if is_none {
-            let res = self.hash_io.clone().unwrap().get(&self.hash).ok();
-            *self.t.borrow_mut() = res;
+            let hash_io_option_ref = &self.hash_io;
+            let hash_io_option = hash_io_option_ref.as_ref();
+            if hash_io_option.is_none() {
+                return Err(LazyIOError::NoHashIOError)
+            }
+            let res = try!(hash_io_option.unwrap().get(&self.hash));
+            *self.t.borrow_mut() = Some(res);
+        }
+        Ok(())
+    }
+
+    pub fn get_ref(&self) -> Result<Ref<T>, LazyIOError> {
+        try!(self.load());
+        if self.is_loaded() {
+            Ok(self.unwrap_ref())
+        } else {
+            Err(LazyIOError::UnloadedError)
         }
     }
 
-    pub fn get_ref(&self) -> Ref<Option<T>> {
-        self.load();
-        self.t.borrow()
-    }
-
-    pub fn get_mut(&mut self) -> RefMut<Option<T>> {
-        self.load();
-        self.t.borrow_mut()
+    pub fn get_mut(&mut self) -> Result<RefMut<T>, LazyIOError> {
+        try!(self.load());
+        if self.is_loaded() {
+            Ok(self.unwrap_mut())
+        } else {
+            Err(LazyIOError::UnloadedError)
+        }
     }
 
     pub fn unwrap_ref(&self) -> Ref<T> {
-        self.load();
         Ref::map(self.t.borrow(), | x | x.as_ref().unwrap())
     }
 
     pub fn unwrap_mut(&mut self) -> RefMut<T> {
-        self.load();
         RefMut::map(self.t.borrow_mut(), | x | x.as_mut().unwrap())
     }
 
@@ -179,8 +228,7 @@ mod test {
             assert_eq!(false, a_again.a.is_loaded());
 
             print!("Get the reference, value will be loaded automatically\n");
-            let new_lazy_opt = a_again.a.get_ref();
-            let new_lazy = new_lazy_opt.as_ref().unwrap();
+            let new_lazy = a_again.a.get_ref().unwrap();
 
             print!("Verify if value is loaded now\n");
             assert_eq!(true, a_again.a.is_loaded());
@@ -196,8 +244,7 @@ mod test {
         // Access mutable
         {
             print!("Load mutable ref\n");
-            let mut new_lazy_opt = a_again.a.get_mut();
-            let mut new_lazy = new_lazy_opt.as_mut().unwrap();
+            let mut new_lazy = a_again.a.get_mut().unwrap();
 
             print!("Modify mutable ref\n");
             new_lazy.b = "changed".to_string();
@@ -214,6 +261,7 @@ mod test {
 
         print!("Reloading...\n");
         let mut a_again: A = hash_io.get(&hash).unwrap();
+        a_again.a.load().unwrap();
 
         {
             print!("Get unwraped value of lazy\n");

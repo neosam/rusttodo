@@ -134,6 +134,10 @@ impl<T> LazyIO<T>
     pub fn is_loaded(&self) -> bool {
         self.t.borrow().is_some()
     }
+
+    pub fn unload(&mut self) {
+        *self.t.borrow_mut() = None;
+    }
 }
 
 #[cfg(test)]
@@ -220,5 +224,11 @@ mod test {
             print!("Get mutable value of lazy\n");
             a_again.a.unwrap_mut();
         }
+
+        print!("Lazy should be loaded\n");
+        assert_eq!(true, a_again.a.is_loaded());
+        a_again.a.unload();
+        print!("Lazy should be unloaded now\n");
+        assert_eq!(false, a_again.a.is_loaded());
     }
 }

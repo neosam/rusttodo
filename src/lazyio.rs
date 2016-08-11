@@ -117,6 +117,16 @@ impl<T> LazyIO<T>
         self.t.borrow_mut()
     }
 
+    pub fn unwrap_ref(&self) -> Ref<T> {
+        self.load();
+        Ref::map(self.t.borrow(), | x | x.as_ref().unwrap())
+    }
+
+    pub fn unwrap_mut(&mut self) -> RefMut<T> {
+        self.load();
+        RefMut::map(self.t.borrow_mut(), | x | x.as_mut().unwrap())
+    }
+
     pub fn put(&mut self, t: T) {
         *self.t.borrow_mut() = Some(t)
     }
@@ -201,6 +211,14 @@ mod test {
         print!("Reloading...\n");
         let mut a_again: A = hash_io.get(&hash).unwrap();
 
-        
+        {
+            print!("Get unwraped value of lazy\n");
+            a_again.a.unwrap_ref();
+        }
+
+        {
+            print!("Get mutable value of lazy\n");
+            a_again.a.unwrap_mut();
+        }
     }
 }

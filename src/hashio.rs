@@ -612,6 +612,13 @@ mod convert_test {
     );
 
     tbd_model! {
+        B {} {
+            b: String,
+            y: String
+        }
+    }
+
+    tbd_model! {
         A {} {
             x: String,
             y: String
@@ -619,7 +626,6 @@ mod convert_test {
             a_convert
         }
     }
-
     impl From<A1> for A {
         fn from(a1: A1) -> A {
             A {
@@ -628,8 +634,33 @@ mod convert_test {
             }
         }
     }
+    impl From<B> for A {
+        fn from(b: B) -> A {
+            A {
+                x: b.b,
+                y: b.y
+            }
+        }
+    }
+    tbd_old_convert_gen!(a_old_convert, A1, A);
 
-    tbd_old_convert_gen!(a_convert, A1, A);
+    fn a_b_convert(hash: &Hash, hash_io: &HashIO, _: &hashio_1::HashIO1) -> Option<A> {
+        hash_io.get(hash).ok()
+    }
+
+    fn a_convert(hash: &Hash, hash_io: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<A> {
+        let option = a_old_convert(hash, hash_io, hash_io_1);
+        if option.is_some() {
+            return option
+        }
+
+        let option = a_b_convert(hash, hash_io, hash_io_1);
+        if option.is_some() {
+            return option
+        }
+
+        return None
+    }
 
     fn save_hashio1() -> Hash {
         let hash_io = HashIO1::new("./unittest/convert_test/".to_string());
@@ -638,8 +669,20 @@ mod convert_test {
         hash_io.put(&a).unwrap();
         hash
     }
+    fn save_b() -> Hash {
+        let hash_io = HashIO::new("unittest/convert_test/".to_string());
+        let b = B {b: "bla".to_string(), y: "".to_string()};
+        let hash = b.as_hash();
+        hash_io.put(&b).unwrap();
+        hash
+    }
 
     fn load_a(hash: &Hash) -> Option<A> {
+        let hash_io = HashIO::new("./unittest/convert_test/".to_string());
+        hash_io.get::<A>(hash).ok()
+    }
+
+    fn load_b(hash: &Hash) -> Option<A> {
         let hash_io = HashIO::new("./unittest/convert_test/".to_string());
         hash_io.get::<A>(hash).ok()
     }
@@ -653,6 +696,7 @@ mod convert_test {
     fn main() {
         remove_dir_all("./unittest/convert_test/").ok();
         let hash1 = save_hashio1();
+        let hash_b = save_b();
         let a = load_a(&hash1).unwrap();
         assert_eq!("bla".to_string(), a.x);
         assert_eq!("".to_string(), a.y);
@@ -661,5 +705,7 @@ mod convert_test {
         let a_again = load_a(&hash).unwrap();
         assert_eq!("bla".to_string(), a_again.x);
         assert_eq!("".to_string(), a_again.y);
+
+        let a_again = load_b(&hash_b).unwrap();
     }
 }

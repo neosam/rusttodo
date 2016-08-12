@@ -200,8 +200,13 @@ macro_rules! tbd_old_convert_gen {
     }
 }
 
-
-
+macro_rules! tbd_convert_gen {
+    ($fn_name: ident, $old_type:ty, $new_type:ty) => {
+        fn $fn_name(hash: & Hash, hash_io: & HashIO, _: & hashio_1::HashIO1) -> Option < $new_type > {
+            hash_io.get(hash).ok()
+        }
+    }
+}
 
 macro_rules! tbd_model {
     //Old pattern calls the new pattern
@@ -643,10 +648,7 @@ mod convert_test {
         }
     }
     tbd_old_convert_gen!(a_old_convert, A1, A);
-
-    fn a_b_convert(hash: &Hash, hash_io: &HashIO, _: &hashio_1::HashIO1) -> Option<A> {
-        hash_io.get(hash).ok()
-    }
+    tbd_convert_gen!(a_b_convert, B, A);
 
     fn a_convert(hash: &Hash, hash_io: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<A> {
         let option = a_old_convert(hash, hash_io, hash_io_1);

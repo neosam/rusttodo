@@ -226,9 +226,11 @@ mod test {
         [b: String]
     ]);
 
-    tbd_model!(A, [], [
-        [a: LazyIO<B>]
-    ]);
+    tbd_model!{
+        A {} {
+            a: LazyIO<B>
+        }
+    }
 
     #[test]
     fn test() {

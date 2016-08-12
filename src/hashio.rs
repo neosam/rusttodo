@@ -253,6 +253,30 @@ macro_rules! tbd_model {
             pub fn flex_fn(hash: &Hash) -> Option<$model_name> {
                 $flex_type_fn(hash)
             }
+
+            pub fn internal_receive<R>(read: &mut R, _: &Hash, hash_io: &HashIO) -> Result<$model_name, HashIOError>
+                    where R: Read {
+                let version = try!(read_u32(read));
+                if version < 1 {
+                    return Err(HashIOError::VersionError(version))
+                }
+                let type_hash = try!(read_hash(read));
+                if type_hash != $model_name::type_hash() {
+                    return Err(HashIOError::TypeError(type_hash))
+                }
+                $( let $attr_name = try!($imp_fn(read)); )* ;
+                $(
+                    let $hash_name;
+                    {
+                        let hash_val = try!(read_hash(read));
+                        $hash_name = try!(hash_io.get(&hash_val));
+                    }
+                )*
+                Ok($model_name{
+                    $($attr_name: $attr_name,)*
+                    $($hash_name: $hash_name),*
+                    })
+            }
         }
 
         impl Typeable for $model_name {
@@ -295,28 +319,9 @@ macro_rules! tbd_model {
         impl Hashtype for $model_name {}
 
         impl HashIOImpl<$model_name> for HashIO {
-            fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<$model_name, HashIOError>
-                    where R: Read {
-                let version = try!(read_u32(read));
-                if version < 1 {
-                    return Err(HashIOError::VersionError(version))
-                }
-                let type_hash = try!(read_hash(read));
-                if type_hash != $model_name::type_hash() {
-                    return Err(HashIOError::TypeError(type_hash))
-                }
-                $( let $attr_name = try!($imp_fn(read)); )* ;
-                $(
-                    let $hash_name;
-                    {
-                        let hash_val = try!(read_hash(read));
-                        $hash_name = try!(self.get(&hash_val));
-                    }
-                )*
-                Ok($model_name{
-                    $($attr_name: $attr_name,)*
-                    $($hash_name: $hash_name),*
-                    })
+            fn receive_hashable<R>(&self, read: &mut R, hash: &Hash) -> Result<$model_name, HashIOError>
+                            where R: Read {
+                $model_name::internal_receive(read, hash, self)
             }
 
             fn store_childs(&self, hashable: &$model_name) -> Result<(), HashIOError> {
@@ -506,10 +511,11 @@ mod btreemaptest {
     use std::io;
     use std::collections::BTreeMap;
 
-    tbd_model!(A, [], [
-        [a: BTreeMap<String, String>]
-    ]);
-
+    tbd_model!{
+        A {} {
+            a: BTreeMap<String, String>
+        }
+    }
     #[test]
     fn test() {
         let hash_io = HashIO::new("unittest/btreemaptest".to_string());

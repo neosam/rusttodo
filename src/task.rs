@@ -74,6 +74,7 @@ use std::io::{Read, Write};
 use std::error;
 use std::fmt;
 use hashio_1;
+use hashio_1::*;
 
 /// Base task type
 tbd_model!{
@@ -82,39 +83,138 @@ tbd_model!{
     } {
         title: String,
         description: String
+    } {
+        task_convert
     }
 }
+
+/// Backward compatible Base task type
+tbd_model_1! {
+    Task1, [
+        [factor: f32, write_f32, read_f32]
+    ], [
+        [title: String],
+        [description: String]
+    ]
+}
+
+impl From<Task1> for Task {
+    fn from(task1: Task1) -> Task {
+        Task {
+            factor: task1.factor,
+            title: task1.title,
+            description: task1.description
+        }
+    }
+}
+
+tbd_old_convert_gen!(task_convert, Task1, Task);
+
 
 
 
 /// A task which got activated.
-tbd_model!(ActiveTask, [
+tbd_model! {
+    ActiveTask {
+        [start: Tm, write_tm, read_tm],
+        [due: Tm, write_tm, read_tm]
+    } {
+        task: Task
+    } {
+        active_task_convert
+    }
+}
+
+/// Backward compatible ActiveTask
+tbd_model_1!(ActiveTask1, [
         [start: Tm, write_tm, read_tm],
         [due: Tm, write_tm, read_tm]
     ], [
-        [task: Task]
+        [task: Task1]
     ]);
+impl From<ActiveTask1> for ActiveTask {
+    fn from(f: ActiveTask1) -> ActiveTask {
+        ActiveTask {
+            start: f.start,
+            due: f.due,
+            task: From::from(f.task)
+        }
+    }
+}
+tbd_old_convert_gen!(active_task_convert, ActiveTask1, ActiveTask);
 
 
 /// A task which is about to get activated
-tbd_model!(PooledTask, [
+
+tbd_model!{
+    PooledTask {
+        [propability: f32, write_f32, read_f32],
+        [cool_down: i16, write_i16, read_i16],
+        [due_days: i16, write_i16, read_i16],
+        [cooling_until: Tm, write_tm, read_tm]
+    } {
+        task: Task
+    } { pooled_task_convert }
+}
+tbd_model_1!(PooledTask1, [
         [propability: f32, write_f32, read_f32],
         [cool_down: i16, write_i16, read_i16],
         [due_days: i16, write_i16, read_i16],
         [cooling_until: Tm, write_tm, read_tm]
     ], [
-        [task: Task]
+        [task: Task1]
     ]);
+impl From<PooledTask1> for PooledTask {
+    fn from(f: PooledTask1) -> PooledTask {
+        PooledTask {
+            propability: f.propability,
+            cool_down: f.cool_down,
+            due_days: f.due_days,
+            cooling_until: f.cooling_until,
+            task: Task::from(f.task)
+        }
+    }
+}
+tbd_old_convert_gen!(pooled_task_convert, PooledTask1, PooledTask);
 
 /// Overall state of the tasks
-tbd_model!{
+tbd_model! {
     TaskStat {
         [ref_tm: Tm, write_tm, read_tm]
     } {
-        active: BTreeMap < String, ActiveTask > ,
+        active: BTreeMap < String, ActiveTask >,
         pool: BTreeMap < String, PooledTask >
+    } { task_stat_convert }
+}
+
+///
+tbd_model_1!{
+    TaskStat1, [
+        [ref_tm: Tm, write_tm, read_tm]
+    ], [
+        [active: BTreeMap < String, ActiveTask1 >],
+        [pool: BTreeMap < String, PooledTask1 >]
+    ]
+}
+
+impl From<TaskStat1> for TaskStat {
+    fn from(f: TaskStat1) -> TaskStat {
+        let mut active: BTreeMap<String, ActiveTask> = BTreeMap::new();
+        let mut pool: BTreeMap<String, PooledTask> = BTreeMap::new();
+        for (key, value) in f.active {
+            active.insert(key, ActiveTask::from(value));
+        }
+        for (key, value) in f.pool {
+            pool.insert(key, PooledTask::from(value));
+        }
+        TaskStat {
+            ref_tm: f.ref_tm,
+            active: active,
+            pool: pool
+        }
     }
 }
+tbd_old_convert_gen!(task_stat_convert, TaskStat1, TaskStat);
 
 
 

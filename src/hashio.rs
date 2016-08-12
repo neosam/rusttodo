@@ -189,11 +189,11 @@ pub fn flex_no<T>(_: &Hash, _: &HashIO, _: &hashio_1::HashIO1) -> Option<T> {
 
 
 macro_rules! tbd_old_convert_gen {
-    ($fn_name: ident, $old_type:ty, $new_type:ty) => {
+    ($fn_name: ident, $old_type:ident, $new_type:ident) => {
         fn $fn_name(hash: &Hash, _: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<$new_type> {
             let trial: Result<$old_type, hashio_1::HashIOError1> = hash_io_1.get(hash);
             match trial {
-                Ok(res) => Some(A::from(res)),
+                Ok(res) => Some($new_type::from(res)),
                 Err(_) => None
             }
         }

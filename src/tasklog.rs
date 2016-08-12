@@ -17,12 +17,14 @@ use self::time::{Tm, now};
 use std::fmt;
 use std::error;
 use hashio_1;
+use hashio_1::*;
 
 #[derive(Debug)]
 pub enum TaskLogError {
     TaskStatError(TaskStatError),
     IOError(io::Error),
     LogError(LogError),
+    HashIOError(HashIOError),
     NoState
 
 }
@@ -33,6 +35,7 @@ impl fmt::Display for TaskLogError {
             TaskLogError::TaskStatError(ref err) => err.fmt(f),
             TaskLogError::IOError(ref err) => err.fmt(f),
             TaskLogError::LogError(ref err) => err.fmt(f),
+            TaskLogError::HashIOError(ref err) => err.fmt(f),
             TaskLogError::NoState => write!(f, "State is none")
         }
     }
@@ -44,6 +47,7 @@ impl error::Error for TaskLogError {
             TaskLogError::TaskStatError(ref err) => err.description(),
             TaskLogError::IOError(ref err) => err.description(),
             TaskLogError::LogError(ref err) => err.description(),
+            TaskLogError::HashIOError(ref err) => err.description(),
             TaskLogError::NoState => "State is none"
         }
     }
@@ -79,9 +83,11 @@ pub enum TaskAction {
 
 impl Writable for TaskAction {
     fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
-        let version = [0u8;4];
+        let version = 1;
+        let type_hash = TaskAction::type_hash();
         let mut size : usize = 0;
-        size += try!(write.write(&version));
+        size += try!(write_u32(version, write));
+        size += try!(write_hash(&type_hash, write));
         match self {
             &TaskAction::ScheduleTask(ref a_task) => {
                 size += try!(write_u8(1, write));
@@ -104,8 +110,6 @@ impl Writable for TaskAction {
     }
 }
 
-hashable_for_writable!(TaskAction);
-
 impl Typeable for TaskAction {
     fn type_hash() -> Hash {
         let mut byte_gen: Vec<u8> = Vec::new();
@@ -116,6 +120,46 @@ impl Typeable for TaskAction {
     }
 }
 impl Hashtype for TaskAction {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TaskAction1 {
+    ScheduleTask(ActiveTask1),
+    PoolTask(PooledTask1),
+    CompleteTask(ActiveTask1),
+    ActivateTask(Vec<ActiveTask1>)
+}
+
+impl Writable for TaskAction1 {
+    fn write_to<W: Write>(&self, write: &mut W) -> Result<usize, io::Error> {
+        let version = [0u8;4];
+        let mut size : usize = 0;
+        size += try!(write.write(&version));
+        match self {
+            &TaskAction1::ScheduleTask(ref a_task) => {
+                size += try!(write_u8(1, write));
+                size += try!(write_hash(&a_task.as_hash(), write));
+            },
+            &TaskAction1::PoolTask(ref p_task) => {
+                size += try!(write_u8(2, write));
+                size += try!(write_hash(&p_task.as_hash(), write));
+            },
+            &TaskAction1::CompleteTask(ref a_task) => {
+                size += try!(write_u8(3, write));
+                size += try!(write_hash(&a_task.as_hash(), write));
+            },
+            &TaskAction1::ActivateTask(ref a_tasks) => {
+                size += try!(write_u8(4, write));
+                size += try!(write_hash(&a_tasks.as_hash(), write));
+            }
+        };
+        Ok(size)
+    }
+}
+
+hashable_for_writable!(TaskAction);
+hashable_for_writable!(TaskAction1);
+
+
 
 impl HashIOImpl<TaskAction> for HashIO {
     fn store_hashable<W>(&self, hashable: &TaskAction, write: &mut W) -> Result<(), HashIOError>
@@ -133,6 +177,14 @@ impl HashIOImpl<TaskAction> for HashIO {
     fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<TaskAction, HashIOError>
                     where R: Read {
         let _  = try!(read_u32(read)); // version
+        let version  = try!(read_u32(read));
+        if version < 1 {
+            return Err(HashIOError::VersionError(version))
+        }
+        let hash_type = try!(read_hash(read));
+        if hash_type != TaskStat::type_hash() {
+            return Err(HashIOError::TypeError(hash_type))
+        }
         let action_type = try!(read_u8(read));
         let hash = try!(read_hash(read));
         let action = match action_type {
@@ -161,13 +213,93 @@ impl HashIOImpl<TaskAction> for HashIO {
     }
 }
 
+impl HashIOImpl1<TaskAction1> for HashIO1 {
+    fn store_hashable<W>(&self, hashable: &TaskAction1, write: &mut W) -> Result<(), HashIOError1>
+        where W: Write {
+        match hashable {
+            &TaskAction1::ScheduleTask(ref a_task) => try!(self.put(a_task)),
+            &TaskAction1::PoolTask(ref p_task) => try!(self.put(p_task)),
+            &TaskAction1::CompleteTask(ref a_task) => try!(self.put(a_task)),
+            &TaskAction1::ActivateTask(ref a_tasks) => try!(self.put(a_tasks))
+        }
+        try!(hashable.write_to(write));
+        Ok(())
+    }
 
-tbd_model!(TaskLogEntry, [
+    fn receive_hashable<R>(&self, read: &mut R) -> Result<TaskAction1, HashIOError1>
+        where R: Read {
+        let _ = try!(read_u32(read));
+        let action_type = try!(read_u8(read));
+        let hash = try!(read_hash(read));
+        let action = match action_type {
+            1 => {
+                let a_task: ActiveTask1 = try!(self.get(&hash));
+                TaskAction1::ScheduleTask(a_task)
+            }
+            2 => {
+                let p_task: PooledTask1 = try!(self.get(&hash));
+                TaskAction1::PoolTask(p_task)
+            }
+            3 => {
+                let a_task: ActiveTask1 = try!(self.get(&hash));
+                TaskAction1::CompleteTask(a_task)
+            }
+            4 => {
+                let a_tasks: Vec<ActiveTask1> = try!(self.get(&hash));
+                TaskAction1::ActivateTask(a_tasks)
+            }
+            _ => {
+                return Err(HashIOError1::Undefined(format!("Task Action id undefined: {}",
+                                                          action_type)));
+            }
+        };
+        Ok(action)
+    }
+}
+
+tbd_model!{
+    TaskLogEntry {
+        [timestamp: Tm, write_tm, read_tm]
+    } {
+        action: TaskAction,
+        state: TaskStat
+    } { task_log_entry_convert }
+}
+tbd_model_1!(TaskLogEntry1, [
     [timestamp: Tm, write_tm, read_tm]
 ], [
-    [action: TaskAction],
-    [state: TaskStat]
+    [action: TaskAction1],
+    [state: TaskStat1]
 ]);
+impl From<TaskAction1> for TaskAction {
+    fn from(f: TaskAction1) -> TaskAction {
+        match f {
+            TaskAction1::ScheduleTask(a_task) =>
+                TaskAction::ScheduleTask(ActiveTask::from(a_task)),
+            TaskAction1::PoolTask(p_task) =>
+                TaskAction::PoolTask(PooledTask::from(p_task)),
+            TaskAction1::CompleteTask(a_task) =>
+                TaskAction::CompleteTask(ActiveTask::from(a_task)),
+            TaskAction1::ActivateTask(a_tasks) => {
+                let mut res: Vec<ActiveTask> = Vec::new();
+                for item in a_tasks {
+                    res.push(ActiveTask::from(item));
+                }
+                TaskAction::ActivateTask(res)
+            }
+        }
+    }
+}
+impl From<TaskLogEntry1> for TaskLogEntry {
+    fn from(f: TaskLogEntry1) -> TaskLogEntry {
+        TaskLogEntry {
+            timestamp: f.timestamp,
+            action: TaskAction::from(f.action),
+            state: TaskStat::from(f.state)
+        }
+    }
+}
+tbd_old_convert_gen!(task_log_entry_convert, TaskLogEntry1, TaskLogEntry);
 
 pub struct TaskLog {
     pub log: IOLog<TaskLogEntry>,

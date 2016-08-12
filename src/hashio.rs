@@ -181,7 +181,9 @@ impl HashIOImpl<String> for HashIO {
 
 }
 
-
+pub fn flex_no<T>(_: &Hash) -> Option<T> {
+    None
+}
 
 
 
@@ -203,19 +205,54 @@ macro_rules! tbd_model {
                     }
                 }
             };
-
     ($model_name:ident
-            { $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),* }
-            { $( $hash_name:ident : $hash_type:ident
+            {
+                $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),*
+            } {
+                $( $hash_name:ident : $hash_type:ident
                     $(
                         <$($anno_type:ty),+>
                      )*
-               ),* }) => {
+                ),*
+            }) => {
+                tbd_model!{
+                    $model_name {
+                        $( [$attr_name : $attr_type, $exp_fn, $imp_fn ] ),*
+                    } {
+                        $( $hash_name : $hash_type
+                            $(
+                                <$($anno_type),+>
+                             )*
+                        ),*
+                    } {
+                        flex_no
+                    }
+                }
+            };
+
+    ($model_name:ident
+            {
+                $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),*
+            } {
+                $( $hash_name:ident : $hash_type:ident
+                    $(
+                        <$($anno_type:ty),+>
+                     )*
+                ),*
+            } {
+                $flex_type_fn:ident
+            }) => {
 
         #[derive(Debug, Clone, PartialEq)]
         pub struct $model_name {
             $(pub $attr_name: $attr_type,)*
             $(pub $hash_name: $hash_type $(<$($anno_type),+>)*),*
+        }
+
+        impl $model_name {
+            pub fn flex_fn(hash: &Hash) -> Option<$model_name> {
+                $flex_type_fn(hash)
+            }
         }
 
         impl Typeable for $model_name {

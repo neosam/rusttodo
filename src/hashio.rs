@@ -181,7 +181,7 @@ impl HashIOImpl<String> for HashIO {
 
 }
 
-pub fn flex_no<T>(_: &Hash) -> Option<T> {
+pub fn flex_no<T>(_: &Hash, _: &HashIO) -> Option<T> {
     None
 }
 
@@ -250,8 +250,8 @@ macro_rules! tbd_model {
         }
 
         impl $model_name {
-            pub fn flex_fn(hash: &Hash) -> Option<$model_name> {
-                $flex_type_fn(hash)
+            pub fn flex_fn(hash: &Hash, hash_io: &HashIO) -> Option<$model_name> {
+                $flex_type_fn(hash, hash_io)
             }
 
             pub fn internal_receive<R>(read: &mut R, _: &Hash, hash_io: &HashIO) -> Result<$model_name, HashIOError>
@@ -321,7 +321,15 @@ macro_rules! tbd_model {
         impl HashIOImpl<$model_name> for HashIO {
             fn receive_hashable<R>(&self, read: &mut R, hash: &Hash) -> Result<$model_name, HashIOError>
                             where R: Read {
-                $model_name::internal_receive(read, hash, self)
+                match $model_name::internal_receive(read, hash, self) {
+                    Ok(res) => Ok(res),
+                    Err(error) => {
+                        match $model_name::flex_fn(hash, self) {
+                            None => Err(error),
+                            Some(res) => Ok(res)
+                        }
+                    }
+                }
             }
 
             fn store_childs(&self, hashable: &$model_name) -> Result<(), HashIOError> {

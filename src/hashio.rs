@@ -188,6 +188,19 @@ pub fn flex_no<T>(_: &Hash, _: &HashIO, _: &hashio_1::HashIO1) -> Option<T> {
 }
 
 
+macro_rules! tbd_old_convert_gen {
+    ($fn_name: ident, $old_type:ty, $new_type:ty) => {
+        fn $fn_name(hash: &Hash, _: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<$new_type> {
+            let trial: Result<$old_type, hashio_1::HashIOError1> = hash_io_1.get(hash);
+            match trial {
+                Ok(res) => Some(A::from(res)),
+                Err(_) => None
+            }
+        }
+    }
+}
+
+
 
 
 macro_rules! tbd_model {
@@ -616,13 +629,7 @@ mod convert_test {
         }
     }
 
-    fn a_convert(hash: &Hash, _: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<A> {
-        let trial: Result<A1, hashio_1::HashIOError1> = hash_io_1.get(hash);
-        match trial {
-            Ok(res) => Some(A::from(res)),
-            Err(_) => None
-        }
-    }
+    tbd_old_convert_gen!(a_convert, A1, A);
 
     fn save_hashio1() -> Hash {
         let hash_io = HashIO1::new("./unittest/convert_test/".to_string());

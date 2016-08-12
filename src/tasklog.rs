@@ -16,6 +16,7 @@ use std::io;
 use self::time::{Tm, now};
 use std::fmt;
 use std::error;
+use hashio_1;
 
 #[derive(Debug)]
 pub enum TaskLogError {

@@ -24,7 +24,7 @@ use std::collections::BTreeMap;
 use std::vec::Vec;
 use std::path::Path;
 use std::fs::rename;
-
+use hashio_1;
 
 
 #[derive(Debug)]
@@ -70,7 +70,8 @@ impl From<io::Error> for HashIOError {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HashIO {
-    pub base_path: String
+    pub base_path: String,
+    pub hash_io_1: hashio_1::HashIO1
 }
 
 pub trait Typeable {
@@ -93,7 +94,8 @@ pub trait HashIOImpl<T> where T: Hashtype {
 impl HashIO {
     pub fn new(path: String) -> HashIO {
         HashIO {
-            base_path: path
+            base_path: path.clone(),
+            hash_io_1: hashio_1::HashIO1::new(path)
         }
     }
 
@@ -181,7 +183,7 @@ impl HashIOImpl<String> for HashIO {
 
 }
 
-pub fn flex_no<T>(_: &Hash, _: &HashIO) -> Option<T> {
+pub fn flex_no<T>(_: &Hash, _: &HashIO, _: &hashio_1::HashIO1) -> Option<T> {
     None
 }
 
@@ -242,7 +244,6 @@ macro_rules! tbd_model {
             } {
                 $flex_type_fn:ident
             }) => {
-
         #[derive(Debug, Clone, PartialEq)]
         pub struct $model_name {
             $(pub $attr_name: $attr_type,)*
@@ -250,8 +251,8 @@ macro_rules! tbd_model {
         }
 
         impl $model_name {
-            pub fn flex_fn(hash: &Hash, hash_io: &HashIO) -> Option<$model_name> {
-                $flex_type_fn(hash, hash_io)
+            pub fn flex_fn(hash: &Hash, hash_io: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<$model_name> {
+                $flex_type_fn(hash, hash_io, hash_io_1)
             }
 
             pub fn internal_receive<R>(read: &mut R, _: &Hash, hash_io: &HashIO) -> Result<$model_name, HashIOError>
@@ -324,7 +325,7 @@ macro_rules! tbd_model {
                 match $model_name::internal_receive(read, hash, self) {
                     Ok(res) => Ok(res),
                     Err(error) => {
-                        match $model_name::flex_fn(hash, self) {
+                        match $model_name::flex_fn(hash, self, &self.hash_io_1) {
                             None => Err(error),
                             Some(res) => Ok(res)
                         }
@@ -419,6 +420,7 @@ mod test2 {
     use super::super::io::*;
     use std::io::{Read, Write};
     use std::io;
+    use super::super::hashio_1;
 
     tbd_model!(A, [
         [a: u8, write_u8, read_u8]
@@ -518,6 +520,7 @@ mod btreemaptest {
     use std::io::{Read, Write};
     use std::io;
     use std::collections::BTreeMap;
+    use hashio_1;
 
     tbd_model!{
         A {} {
@@ -589,6 +592,7 @@ mod convert_test {
     use std::io::{Read, Write};
     use std::io;
     use std::fs::remove_dir_all;
+    use hashio_1;
 
     tbd_model_1!(A1, [], [
         [x: String]]

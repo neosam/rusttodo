@@ -222,6 +222,7 @@ mod test {
     use std::io::{Read, Write};
     use std::io;
     use std::fs::remove_dir_all;
+    use super::super::hashio_1;
 
     tbd_model!(A, [
         [a: u8, write_u8, read_u8]

@@ -64,6 +64,7 @@ impl From<io::Error> for HashIOError1 {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct HashIO1 {
     pub base_path: String
 }

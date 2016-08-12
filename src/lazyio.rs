@@ -221,6 +221,7 @@ mod test {
     use std::io::{Read, Write};
     use std::io;
     use std::fs::remove_dir_all;
+    use hashio_1;
 
     tbd_model!(B, [], [
         [b: String]

@@ -73,6 +73,7 @@ use hash::*;
 use std::io::{Read, Write};
 use std::error;
 use std::fmt;
+use hashio_1;
 
 /// Base task type
 tbd_model!{

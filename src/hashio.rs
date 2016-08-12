@@ -208,6 +208,24 @@ macro_rules! tbd_convert_gen {
     }
 }
 
+macro_rules! tbd_convert_chain {
+    ($fn_name: ident, $new_type: ty, [
+        $($convert_fn: ident),+
+    ]) => {
+        fn $fn_name(hash: &Hash, hash_io: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<$new_type> {
+            $(
+                let option = $convert_fn(hash, hash_io, hash_io_1);
+                if option.is_some() {
+                    return option
+                }
+            )+
+            return None
+        }
+    }
+}
+
+
+
 macro_rules! tbd_model {
     //Old pattern calls the new pattern
     ($model_name:ident,
@@ -649,20 +667,8 @@ mod convert_test {
     }
     tbd_old_convert_gen!(a_old_convert, A1, A);
     tbd_convert_gen!(a_b_convert, B, A);
+    tbd_convert_chain!(a_convert, A, [a_old_convert, a_b_convert]);
 
-    fn a_convert(hash: &Hash, hash_io: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<A> {
-        let option = a_old_convert(hash, hash_io, hash_io_1);
-        if option.is_some() {
-            return option
-        }
-
-        let option = a_b_convert(hash, hash_io, hash_io_1);
-        if option.is_some() {
-            return option
-        }
-
-        return None
-    }
 
     fn save_hashio1() -> Hash {
         let hash_io = HashIO1::new("./unittest/convert_test/".to_string());

@@ -187,13 +187,30 @@ impl HashIOImpl<String> for HashIO {
 
 
 macro_rules! tbd_model {
+    //Old pattern calls the new pattern
     ($model_name:ident,
-            [ $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),* ] ,
-            [ $( [$hash_name:ident : $hash_type:ident
+            [
+                $([$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),*
+            ],
+            [
+                $( [ $hash_name:ident : $hash_type:ident ] ),*
+            ]) => {
+                tbd_model!{
+                    $model_name {
+                        $([ $attr_name : $attr_type, $exp_fn, $imp_fn ]),*
+                    } {
+                        $( $hash_name : $hash_type ),*
+                    }
+                }
+            };
+
+    ($model_name:ident
+            { $( [$attr_name:ident : $attr_type:ty, $exp_fn:ident, $imp_fn:ident ] ),* }
+            { $( $hash_name:ident : $hash_type:ident
                     $(
                         <$($anno_type:ty),+>
-                     )*]
-               ),* ]) => {
+                     )*
+               ),* }) => {
 
         #[derive(Debug, Clone, PartialEq)]
         pub struct $model_name {

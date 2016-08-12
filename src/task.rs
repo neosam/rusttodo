@@ -75,12 +75,14 @@ use std::error;
 use std::fmt;
 
 /// Base task type
-tbd_model!(Task, [
+tbd_model!{
+    Task {
         [factor: f32, write_f32, read_f32]
-    ], [
-        [title: String],
-        [description: String]
-    ]);
+    } {
+        title: String,
+        description: String
+    }
+}
 
 
 
@@ -104,12 +106,14 @@ tbd_model!(PooledTask, [
     ]);
 
 /// Overall state of the tasks
-tbd_model!(TaskStat, [
+tbd_model!{
+    TaskStat {
         [ref_tm: Tm, write_tm, read_tm]
-    ], [
-        [active: BTreeMap <String, ActiveTask>],
-        [pool: BTreeMap <String, PooledTask>]
-    ]);
+    } {
+        active: BTreeMap < String, ActiveTask > ,
+        pool: BTreeMap < String, PooledTask >
+    }
+}
 
 
 

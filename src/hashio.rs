@@ -598,10 +598,14 @@ mod convert_test {
         [x: String]]
     );
 
-    tbd_model!(A, [], [
-        [x: String],
-        [y: String]]
-    );
+    tbd_model! {
+        A {} {
+            x: String,
+            y: String
+        } {
+            a_convert
+        }
+    }
 
     impl From<A1> for A {
         fn from(a1: A1) -> A {
@@ -609,6 +613,14 @@ mod convert_test {
                 x: a1.x,
                 y: "".to_string()
             }
+        }
+    }
+
+    fn a_convert(hash: &Hash, _: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<A> {
+        let trial: Result<A1, hashio_1::HashIOError1> = hash_io_1.get(hash);
+        match trial {
+            Ok(res) => Some(A::from(res)),
+            Err(_) => None
         }
     }
 
@@ -622,16 +634,7 @@ mod convert_test {
 
     fn load_a(hash: &Hash) -> Option<A> {
         let hash_io = HashIO::new("./unittest/convert_test/".to_string());
-        let hash_io1 = HashIO1::new("./unittest/convert_test/".to_string());
-        let res = hash_io.get::<A>(hash);
-        if res.is_ok() {
-            return Some(res.unwrap())
-        }
-        let res = hash_io1.get::<A1>(hash);
-        if res.is_ok() {
-            return Some(From::from(res.unwrap()))
-        }
-        None
+        hash_io.get::<A>(hash).ok()
     }
 
     fn save_a(a: &A) {

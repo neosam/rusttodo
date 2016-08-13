@@ -12,6 +12,7 @@ pub mod hashio_1;
 pub mod hashio;
 pub mod lazyio;
 pub mod log;
+pub mod iolog_1;
 pub mod iolog;
 pub mod task;
 

@@ -12,8 +12,8 @@ use self::time::{now};
 pub struct IOLogItem1<T>
     where T: Hashable,
           HashIO1: HashIOImpl1<T> {
-    parent_hash: Hash,
-    item: T
+    pub parent_hash: Hash,
+    pub item: T
 }
 
 impl<T> Writable for IOLogItem1<T>

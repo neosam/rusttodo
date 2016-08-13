@@ -8,6 +8,8 @@ use std::io;
 use std::io::{Write, Read};
 use std::fs::{File};
 use self::time::{now};
+use iolog_1::{IOLog1, IOLogItem1};
+use hashio_1::{HashIO1, HashIOImpl1};
 
 impl From<HashIOError> for LogError {
     fn from(_: HashIOError) -> LogError {
@@ -18,8 +20,8 @@ impl From<HashIOError> for LogError {
 pub struct IOLogItem<T>
         where T: Hashtype,
               HashIO: HashIOImpl<T> {
-    parent_hash: Hash,
-    item: T
+    pub parent_hash: Hash,
+    pub item: T
 }
 
 impl<T> Writable for IOLogItem<T>
@@ -217,6 +219,32 @@ impl<T> IOLog<T>
         IOLog{
             head: head,
             hashio: HashIO::new(path)
+        }
+    }
+}
+
+impl<T, U> From<IOLogItem1<T>> for IOLogItem<U>
+        where T: Hashable, U: Hashtype,
+              HashIO1: HashIOImpl1<T>,
+              HashIO: HashIOImpl<U>,
+              U: From<T> {
+    fn from(f: IOLogItem1<T>) -> IOLogItem<U> {
+        IOLogItem {
+            parent_hash: f.parent_hash,
+            item: U::from(f.item)
+        }
+    }
+}
+
+impl<T, U> From<IOLog1<T>> for IOLog<U>
+        where T: Hashable, U: Hashtype,
+                  HashIO1: HashIOImpl1<T>,
+                  HashIO: HashIOImpl<U>,
+                  U: From<T> {
+    fn from(f: IOLog1<T>) -> IOLog<U> {
+        IOLog {
+            head: f.head.map(| x | IOLogItem::from(x) ),
+            hashio: HashIO::new(f.hashio.base_path)
         }
     }
 }

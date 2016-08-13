@@ -9,6 +9,7 @@ use task::*;
 use io::*;
 use log::*;
 use iolog::*;
+use iolog_1::IOLog1;
 use hashio::*;
 use hash::*;
 use std::io::{Write, Read};
@@ -308,10 +309,15 @@ pub struct TaskLog {
 
 impl TaskLog {
     pub fn new(path: String) -> TaskLog {
-        TaskLog {
-            log: IOLog::new(path),
+        let mut task_log = TaskLog {
+            log: IOLog::new(path.clone()),
             state: TaskStat::empty_task_stat()
+        };
+        if task_log.log.head.is_none() {
+            let log1 = IOLog1::<TaskLogEntry1>::new(path);
+            task_log.log = IOLog::from(log1)
         }
+        task_log
     }
 
     pub fn load_head(&mut self) -> Result<(), TaskLogError> {

@@ -12,8 +12,8 @@ use iolog_1::{IOLog1, IOLogItem1};
 use hashio_1::{HashIO1, HashIOImpl1};
 
 impl From<HashIOError> for LogError {
-    fn from(_: HashIOError) -> LogError {
-        LogError::Unknown
+    fn from(hash_io_error: HashIOError) -> LogError {
+        LogError::CustomError(format!("LogError::HashIOError: {}", hash_io_error))
     }
 }
 
@@ -54,7 +54,8 @@ impl<T> Typeable for IOLogItem<T>
         let id_bytes = id.as_bytes();
         byte_gen.extend_from_slice(&*Hash::hash_bytes(id_bytes).get_bytes());
         byte_gen.extend_from_slice(&*T::type_hash().get_bytes());
-        Hash::hash_bytes(byte_gen.as_slice())
+        let hash = Hash::hash_bytes(byte_gen.as_slice());
+        hash
     }
 }
 impl<T> Hashtype for IOLogItem<T>

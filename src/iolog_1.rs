@@ -36,8 +36,8 @@ impl<T> Hashable for IOLogItem1<T>
 }
 
 impl From<HashIOError1> for LogError {
-    fn from(_: HashIOError1) -> LogError {
-        LogError::Unknown
+    fn from(err: HashIOError1) -> LogError {
+        LogError::CustomError(format!("HashIOError1: {}", err))
     }
 }
 

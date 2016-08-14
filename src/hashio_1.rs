@@ -108,7 +108,13 @@ impl HashIO1 {
                 where HashIO1: HashIOImpl1<T>,
                       T: Hashable {
         let filename = self.filename_for_hash(hash);
-        let mut read = try!(File::open(filename));
+        let mut read = match File::open(filename.clone()) {
+            Ok(x) => x,
+            Err(err) => {
+                print!("HashIO1:  Error opening {}: {}\n", filename, err);
+                return Err(HashIOError1::from(err))
+            }
+        };
         let result : T = try!(self.receive_hashable(&mut read));
         Ok(result)
     }

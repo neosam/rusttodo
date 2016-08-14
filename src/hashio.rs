@@ -120,7 +120,13 @@ impl HashIO {
                 where HashIO: HashIOImpl<T>,
                       T: Hashtype {
         let filename = self.filename_for_hash(hash);
-        let mut read = try!(File::open(filename));
+        let mut read = match File::open(filename.clone()) {
+            Ok(r) => r,
+            Err(err) => {
+                print!("Could not load: {}\n", filename);
+                return Err(HashIOError::from(err))
+            }
+        };
         let result : T = try!(self.receive_hashable(&mut read, hash));
         Ok(result)
     }
@@ -361,6 +367,9 @@ macro_rules! tbd_model {
                 match $model_name::internal_receive(read, hash, self) {
                     Ok(res) => Ok(res),
                     Err(error) => {
+                        print!("HashIO::receive_hash couldn't load type {} ({}) for hash {}: {}\n",
+                            stringify!($model_name), $model_name::type_hash().as_string(),
+                            hash.as_string(), error);
                         match $model_name::flex_fn(hash, self, &self.hash_io_1) {
                             None => Err(error),
                             Some(res) => Ok(res)

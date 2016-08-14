@@ -19,6 +19,7 @@ use std::fmt;
 use std::error;
 use hashio_1;
 use hashio_1::*;
+use std::iter::FromIterator;
 
 #[derive(Debug)]
 pub enum TaskLogError {
@@ -33,11 +34,11 @@ pub enum TaskLogError {
 impl fmt::Display for TaskLogError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            TaskLogError::TaskStatError(ref err) => err.fmt(f),
-            TaskLogError::IOError(ref err) => err.fmt(f),
-            TaskLogError::LogError(ref err) => err.fmt(f),
-            TaskLogError::HashIOError(ref err) => err.fmt(f),
-            TaskLogError::NoState => write!(f, "State is none")
+            TaskLogError::TaskStatError(ref err) => write!(f, "TaskLogError::TaskStatError: {}", err),
+            TaskLogError::IOError(ref err) => write!(f, "TaskLogError::IOError: {}", err),
+            TaskLogError::LogError(ref err) => write!(f, "TaskLogError::LogError: {}", err),
+            TaskLogError::HashIOError(ref err) => write!(f, "TaskLogError::HashIOError: {}", err),
+            TaskLogError::NoState => write!(f, "TaskLogError::NoState")
         }
     }
 }
@@ -117,7 +118,8 @@ impl Typeable for TaskAction {
         let id = String::from("TaskAction");
         let id_bytes = id.as_bytes();
         byte_gen.extend_from_slice(&*Hash::hash_bytes(id_bytes).get_bytes());
-        Hash::hash_bytes(byte_gen.as_slice())
+        let hash = Hash::hash_bytes(byte_gen.as_slice());
+        hash
     }
 }
 impl Hashtype for TaskAction {}
@@ -177,13 +179,12 @@ impl HashIOImpl<TaskAction> for HashIO {
 
     fn receive_hashable<R>(&self, read: &mut R, _: &Hash) -> Result<TaskAction, HashIOError>
                     where R: Read {
-        let _  = try!(read_u32(read)); // version
         let version  = try!(read_u32(read));
         if version < 1 {
             return Err(HashIOError::VersionError(version))
         }
         let hash_type = try!(read_hash(read));
-        if hash_type != TaskStat::type_hash() {
+        if hash_type != TaskAction::type_hash() {
             return Err(HashIOError::TypeError(hash_type))
         }
         let action_type = try!(read_u8(read));
@@ -309,13 +310,33 @@ pub struct TaskLog {
 
 impl TaskLog {
     pub fn new(path: String) -> TaskLog {
+        print!("Create new TaskLog\n");
         let mut task_log = TaskLog {
-            log: IOLog::new(path.clone()),
+            log: IOLog::<TaskLogEntry>::new(path.clone()),
             state: TaskStat::empty_task_stat()
         };
         if task_log.log.head.is_none() {
+            print!("Fallback to old version\n");
             let log1 = IOLog1::<TaskLogEntry1>::new(path);
-            task_log.log = IOLog::from(log1)
+            print!("Old log loaded, collect hashes\n");
+            let mut hashes = Vec::from_iter(LogIteratorHash::from_log(&log1));
+            hashes.reverse();
+            print!("Rewrite log");
+            for hash in hashes {
+                print!("Rewrite hash: {}\n", hash.as_string());
+                let entry1: TaskLogEntry1 = match log1.get(hash) {
+                    Ok(x) => x,
+                    Err(err) => {
+                        print!("Error loading hash {}: {}", hash.as_string(), err);
+                        break
+                    }
+                };
+                let entry: TaskLogEntry = TaskLogEntry::from(entry1);
+                task_log.log.push(entry);
+            }
+        }
+        if task_log.log.head.is_none() {
+            print!("Fallback load failed");
         }
         task_log
     }

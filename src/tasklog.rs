@@ -20,6 +20,7 @@ use std::error;
 use hashio_1;
 use hashio_1::*;
 use std::iter::FromIterator;
+use lazyio::*;
 
 #[derive(Debug)]
 pub enum TaskLogError {
@@ -27,6 +28,7 @@ pub enum TaskLogError {
     IOError(io::Error),
     LogError(LogError),
     HashIOError(HashIOError),
+    LazyIOError(LazyIOError),
     NoState
 
 }
@@ -38,6 +40,7 @@ impl fmt::Display for TaskLogError {
             TaskLogError::IOError(ref err) => write!(f, "TaskLogError::IOError: {}", err),
             TaskLogError::LogError(ref err) => write!(f, "TaskLogError::LogError: {}", err),
             TaskLogError::HashIOError(ref err) => write!(f, "TaskLogError::HashIOError: {}", err),
+            TaskLogError::LazyIOError(ref err) => write!(f, "TaskLogError::LazyIOError: {}", err),
             TaskLogError::NoState => write!(f, "TaskLogError::NoState")
         }
     }
@@ -50,6 +53,7 @@ impl error::Error for TaskLogError {
             TaskLogError::IOError(ref err) => err.description(),
             TaskLogError::LogError(ref err) => err.description(),
             TaskLogError::HashIOError(ref err) => err.description(),
+            TaskLogError::LazyIOError(ref err) => err.description(),
             TaskLogError::NoState => "State is none"
         }
     }
@@ -73,6 +77,11 @@ impl From<io::Error> for TaskLogError {
     }
 }
 
+impl From<LazyIOError> for TaskLogError {
+    fn from(err: LazyIOError) -> TaskLogError {
+        TaskLogError::LazyIOError(err)
+    }
+}
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -264,6 +273,15 @@ tbd_model!{
         [timestamp: Tm, write_tm, read_tm]
     } {
         action: TaskAction,
+        state: LazyIO<TaskStat>
+    } { task_log_entry2_convert}
+}
+
+tbd_model!{
+    TaskLogEntry2 {
+        [timestamp: Tm, write_tm, read_tm]
+    } {
+        action: TaskAction,
         state: TaskStat
     } { task_log_entry_convert }
 }
@@ -292,16 +310,35 @@ impl From<TaskAction1> for TaskAction {
         }
     }
 }
+
+impl From<TaskLogEntry2> for TaskLogEntry {
+    fn from(f: TaskLogEntry2) -> TaskLogEntry {
+        TaskLogEntry {
+            timestamp: f.timestamp,
+            action: f.action,
+            state: LazyIO::new(f.state)
+        }
+    }
+}
+tbd_convert_gen!(task_log_entry2_convert, TaskLogEntry2, TaskLogEntry);
+
 impl From<TaskLogEntry1> for TaskLogEntry {
     fn from(f: TaskLogEntry1) -> TaskLogEntry {
-        TaskLogEntry {
+        TaskLogEntry::from(TaskLogEntry2::from(f))
+    }
+}
+
+impl From<TaskLogEntry1> for TaskLogEntry2 {
+    fn from(f: TaskLogEntry1) -> TaskLogEntry2 {
+        TaskLogEntry2 {
             timestamp: f.timestamp,
             action: TaskAction::from(f.action),
             state: TaskStat::from(f.state)
         }
     }
 }
-tbd_old_convert_gen!(task_log_entry_convert, TaskLogEntry1, TaskLogEntry);
+tbd_old_convert_gen!(task_log_entry_convert, TaskLogEntry1, TaskLogEntry2);
+
 
 pub struct TaskLog {
     pub log: IOLog<TaskLogEntry>,
@@ -347,7 +384,8 @@ impl TaskLog {
             None => self.state = TaskStat::empty_task_stat(),
             Some(hash) => {
                 let entry = try!(self.log.get(hash));
-                self.state = entry.state
+                let state = try!(entry.state.get_ref());
+                self.state = state.clone();
             }
         };
         Ok(())
@@ -358,7 +396,7 @@ impl TaskLog {
         let entry = TaskLogEntry {
             timestamp: tm,
             action: action,
-            state: self.state.clone()
+            state: LazyIO::new(self.state.clone())
         };
         self.log.push(entry);
         Ok(())

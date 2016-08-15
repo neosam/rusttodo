@@ -1,3 +1,11 @@
+//! Hash type definition, helpful helpers and traits to represent as hash
+//!
+//! # Usage
+//! This module provides functionality to let a struct
+//! represent itself as a cryptographic hash value.
+//! It also provides the Writable trait which can be used
+//! to save the struct.  Via a macro, a Hashable trait can
+//! be implemented if it implements the Writable trait.
 extern crate crypto;
 extern crate byteorder;
 
@@ -88,6 +96,16 @@ impl Hash {
         bytes_to_string(&*self.get_bytes())
     }
 
+    /// Transforms a String which represents a Hash back to the SHA256 hash.
+    ///
+    /// # Panic
+    /// If the string is shorter than 64 characters it will panic.
+    ///
+    /// # Unexpected
+    /// If a non hex character is in the string, it will be treated as 0.
+    ///
+    /// # Warning
+    /// Please don't confuse it with hash_string.
     pub fn from_string(str: String) -> Hash {
         let bytes = str.as_bytes();
         let mut res = [0u8; 32];
@@ -98,6 +116,10 @@ impl Hash {
         Hash::Sha3(res)
     }
 
+    /// Transforms the first 32 bytes of a string into a SHA256 hash.
+    ///
+    ///  Warning
+    /// Please don't confuse it with from_string.
     pub fn hash_string(str: String) -> Hash {
         let bytes = str.as_bytes();
         Hash::hash_bytes(bytes)
@@ -126,6 +148,7 @@ pub trait Hashable {
     fn as_hash(&self) -> Hash;
 }
 
+/// A hash can hash itself
 impl Hashable for Hash {
     fn as_hash(&self) -> Hash {
         Hash::hash_bytes(&*self.get_bytes())

@@ -1,15 +1,18 @@
-//! Cryptographic hashes including IO
+//! IO operations for hashable objects.
 //!
 //! # Usage
-//! This module provides functionality to let a struct
-//! represent itself as a cryptographic hash value.
-//! It also provides the Writable trait which can be used
-//! to save the struct.  Via a macro, a Hashable trait can
-//! be implemented if it implements the Writable trait.
+//! The main point here is to create objecs which can iteract with the HashIO
+//! object.  These objects should be able to (de)serialize themselves, the children.
+//! To do this, the HashIOImpl trait can be implemented and to be able to do this,
+//! several the type must provide some features:
 //!
-//! If a trait implements Writable, Readable and Hashable,
-//! it can also implement the HashIO trait which allows
-//! the values to be cashed.
+//! * Hashable:  Create a hash which represents its content.
+//! * Typeable:  Create a hash which represents its type.
+//! * It should store a version number and the type hash and check against it when loading.
+//!
+//! This sounds complicated and that's why there are marcos which implement
+//! everything required.
+
 
 extern crate crypto;
 extern crate byteorder;
@@ -27,6 +30,7 @@ use std::fs::rename;
 use hashio_1;
 
 
+/// Default error type for HashIO.
 #[derive(Debug)]
 pub enum HashIOError {
     Undefined(String),
@@ -35,9 +39,6 @@ pub enum HashIOError {
     IOError(io::Error),
     ParseError(Box<error::Error>)
 }
-
-
-
 impl fmt::Display for HashIOError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
@@ -49,7 +50,6 @@ impl fmt::Display for HashIOError {
         }
     }
 }
-
 impl error::Error for HashIOError {
     fn description(&self) -> &str {
         match *self {
@@ -61,25 +61,32 @@ impl error::Error for HashIOError {
         }
     }
 }
-
 impl From<io::Error> for HashIOError {
     fn from(err: io::Error) -> HashIOError {
         HashIOError::IOError(err)
     }
 }
 
+
+/// Structure to store and lead HashIO-able values
 #[derive(Clone, Debug, PartialEq)]
 pub struct HashIO {
     pub base_path: String,
     pub hash_io_1: hashio_1::HashIO1
 }
 
+/// Allows a type to identify itself.
 pub trait Typeable {
+    /// Identifies the type using a unique hash value.
     fn type_hash() -> Hash;
 }
 
+/// Trait makes sure the type can identify itself (the type) and it's content with hash values.
 pub trait Hashtype : Hashable + Typeable {}
 
+/// Makes a type HashIO-able.
+///
+/// A type needs to be able to load the hashable and to store it again.
 pub trait HashIOImpl<T> where T: Hashtype {
     fn receive_hashable<R>(&self, read: &mut R, hash: &Hash) -> Result<T, HashIOError>
         where R: Read;
@@ -194,6 +201,12 @@ pub fn flex_no<T>(_: &Hash, _: &HashIO, _: &hashio_1::HashIO1) -> Option<T> {
 }
 
 
+/// Creates a convert function to from an old HashIO-able to a new one.
+///
+/// The From trait must be implemented for this.
+///
+/// Usage:  tbd_convert_gen!(new_function_name, OldType, NewType);
+#[macro_export]
 macro_rules! tbd_old_convert_gen {
     ($fn_name: ident, $old_type:ident, $new_type:ident) => {
         fn $fn_name(hash: &Hash, _: &HashIO, hash_io_1: &hashio_1::HashIO1) -> Option<$new_type> {
@@ -206,6 +219,12 @@ macro_rules! tbd_old_convert_gen {
     }
 }
 
+/// Creates a convert function from one HashIO-able to another one.
+///
+/// The From trait must be implemented for this.
+///
+/// Usage:  tbd_convert_gen!(new_function_name, OldType, NewType);
+#[macro_export]
 macro_rules! tbd_convert_gen {
     ($fn_name: ident, $old_type:ty, $new_type:ty) => {
         fn $fn_name(hash: & Hash, hash_io: & HashIO, _: & hashio_1::HashIO1) -> Option < $new_type > {
@@ -214,6 +233,13 @@ macro_rules! tbd_convert_gen {
     }
 }
 
+/// Chains several convert functions and creates a new one.
+///
+/// It will try all of them
+///
+/// Usage:  tbd_convert_chain!(new_function_name, NewType,
+///             OldType1, OldType1, ...);
+#[macro_export]
 macro_rules! tbd_convert_chain {
     ($fn_name: ident, $new_type: ty, [
         $($convert_fn: ident),+
@@ -230,8 +256,8 @@ macro_rules! tbd_convert_chain {
     }
 }
 
-
-
+/// Creates a fully functional HashIO-able type.
+#[macro_export]
 macro_rules! tbd_model {
     //Old pattern calls the new pattern
     ($model_name:ident,

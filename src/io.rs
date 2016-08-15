@@ -1,3 +1,5 @@
+//! Provides functions to read and write data in a binary representation.
+
 extern crate crypto;
 extern crate byteorder;
 extern crate time;

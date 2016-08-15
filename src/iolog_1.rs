@@ -1,3 +1,5 @@
+//! Old LogIO implementation for backward compatibility
+
 extern crate time;
 use hash::*;
 use hashio_1::*;

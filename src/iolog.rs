@@ -1,3 +1,5 @@
+//! Implementation of the hashable log which uses a HashIO in the background.
+
 extern crate time;
 
 use hash::*;

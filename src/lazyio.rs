@@ -1,3 +1,12 @@
+//! Load HashIO-able objects only if they are required.
+//!
+//! If you store huge amount of data, you probably only want to load the data which is
+//! required.  LazyIO does this for you.  When loaded, it only stores the HashIO and the hash
+//! and you need to borrow the reference when you want to access it.
+//!
+//! The downside here it that IO errors can occur when you try to access the data.  For this,
+//! extra error handling is required (or you just the unwrap methods which can cause a panic).
+
 use io::*;
 use hash::*;
 use hashio::*;

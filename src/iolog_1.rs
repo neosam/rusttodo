@@ -1,10 +1,12 @@
 //! Old LogIO implementation for backward compatibility
 
 extern crate time;
+
+
 use hash::*;
 use hashio_1::*;
 use io::*;
-use log::*;
+use logger::*;
 use std::io;
 use std::io::{Write, Read};
 use std::fs::{File};
@@ -126,7 +128,7 @@ impl<T> Log for IOLog1<T>
             Err(_) => { return Hash::None }
         };
         if hash == parent_hash {
-            print!("WARNING:  hash equals parent hash\n");
+            warn!("hash equals parent hash\n");
         }
         hash
     }
@@ -150,7 +152,7 @@ impl<T> Log for IOLog1<T>
     fn parent_hash(&self, hash: Hash) -> Result<Option<Hash>, LogError> {
         let item: IOLogItem1<T> = try!(self.hashio.get::<IOLogItem1<T>>(&hash));
         if item.parent_hash == hash {
-            print!("WARNING: parent_hash detected redundancy\n");
+            warn!("parent_hash detected redundancy\n");
         }
         let res = Ok(match item.parent_hash {
             Hash::None => Option::None,

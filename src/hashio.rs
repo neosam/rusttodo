@@ -17,7 +17,6 @@
 extern crate crypto;
 extern crate byteorder;
 
-
 use std::io::{Read, Write};
 use std::{io, error, fmt};
 use hash::*;
@@ -130,7 +129,7 @@ impl HashIO {
         let mut read = match File::open(filename.clone()) {
             Ok(r) => r,
             Err(err) => {
-                print!("Could not load: {}\n", filename);
+                warn!("Could not load: {}", filename);
                 return Err(HashIOError::from(err))
             }
         };
@@ -393,7 +392,7 @@ macro_rules! tbd_model {
                 match $model_name::internal_receive(read, hash, self) {
                     Ok(res) => Ok(res),
                     Err(error) => {
-                        print!("HashIO::receive_hash couldn't load type {} ({}) for hash {}: {}\n",
+                        warn!("HashIO::receive_hash couldn't load type {} ({}) for hash {}: {}",
                             stringify!($model_name), $model_name::type_hash().as_string(),
                             hash.as_string(), error);
                         match $model_name::flex_fn(hash, self, &self.hash_io_1) {

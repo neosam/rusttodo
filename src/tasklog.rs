@@ -7,7 +7,7 @@ extern crate time;
 
 use task::*;
 use io::*;
-use log::*;
+use logger::*;
 use iolog::*;
 use iolog_1::IOLog1;
 use hashio::*;
@@ -347,24 +347,24 @@ pub struct TaskLog {
 
 impl TaskLog {
     pub fn new(path: String) -> TaskLog {
-        print!("Create new TaskLog\n");
+        trace!("Create new TaskLog\n");
         let mut task_log = TaskLog {
             log: IOLog::<TaskLogEntry>::new(path.clone()),
             state: TaskStat::empty_task_stat()
         };
         if task_log.log.head.is_none() {
-            print!("Fallback to old version\n");
+            info!("Fallback to old version\n");
             let log1 = IOLog1::<TaskLogEntry1>::new(path);
-            print!("Old log loaded, collect hashes\n");
+            info!("Old log loaded, collect hashes\n");
             let mut hashes = Vec::from_iter(LogIteratorHash::from_log(&log1));
             hashes.reverse();
-            print!("Rewrite log");
+            info!("Rewrite log");
             for hash in hashes {
-                print!("Rewrite hash: {}\n", hash.as_string());
+                info!("Rewrite hash: {}\n", hash.as_string());
                 let entry1: TaskLogEntry1 = match log1.get(hash) {
                     Ok(x) => x,
                     Err(err) => {
-                        print!("Error loading hash {}: {}", hash.as_string(), err);
+                        warn!("Error loading hash {}: {}", hash.as_string(), err);
                         break
                     }
                 };
@@ -373,7 +373,7 @@ impl TaskLog {
             }
         }
         if task_log.log.head.is_none() {
-            print!("Fallback load failed");
+            warn!("Fallback load failed");
         }
         task_log
     }

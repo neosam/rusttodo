@@ -111,7 +111,7 @@ impl HashIO1 {
         let mut read = match File::open(filename.clone()) {
             Ok(x) => x,
             Err(err) => {
-                print!("HashIO1:  Error opening {}: {}\n", filename, err);
+                warn!("HashIO1:  Could not open opening {}: {}\n", filename, err);
                 return Err(HashIOError1::from(err))
             }
         };

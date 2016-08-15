@@ -1,6 +1,8 @@
 //! Task management library to successfully complete tasks
 
 //#![feature (log_syntax, trace_macros)]
+#[macro_use]
+extern crate log;
 
 #[macro_use]
 pub mod hash;
@@ -11,7 +13,7 @@ pub mod hashio_1;
 #[macro_use]
 pub mod hashio;
 pub mod lazyio;
-pub mod log;
+pub mod logger;
 pub mod iolog_1;
 pub mod iolog;
 pub mod task;

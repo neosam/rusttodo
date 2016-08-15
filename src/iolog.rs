@@ -258,7 +258,7 @@ mod test {
     use super::super::hash::*;
     use super::super::hashio::*;
     use super::super::io::*;
-    use super::super::log::*;
+    use super::super::logger::*;
     use super::*;
     use std::io::{Read, Write};
     use std::io;

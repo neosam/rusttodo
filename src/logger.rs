@@ -100,7 +100,7 @@ pub trait Log {
 ///
 /// # Examples
 /// ```
-/// use tbd::log::*;
+/// use tbd::logger::*;
 /// use tbd::hashio::*;
 /// let mut log = DefaultLog::<String>::default();
 ///
@@ -152,7 +152,7 @@ impl<'a, L: Log<Item=T>, T: Hashable + 'a> Iterator for LogIteratorRef<'a, L, T>
 ///
 /// ```
 /// use tbd::hash::*;
-/// use tbd::log::*;
+/// use tbd::logger::*;
 /// let mut log = DefaultLog::<String>::default();
 ///
 /// log.push("str1".to_string());

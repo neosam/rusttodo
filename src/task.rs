@@ -20,6 +20,8 @@
 //!         "A task".to_string(),
 //!         // More detailed task description
 //!         "A more detailed description of the task".to_string(),
+//!         // A category
+//!         "cat".to_string(),
 //!         // Importance factor
 //!         1.0,
 //!         // Task deadline is in three days
@@ -32,6 +34,8 @@
 //!         "Pooled task".to_string(),
 //!         // A more detailed description
 //!         "A description for the pooled task".to_string(),
+//!         // A category
+//!         "cat".to_string(),
 //!         // Importance factor
 //!         1.0,
 //!         // Propability the task is picked (0 = never, 1 = always)
@@ -517,8 +521,8 @@ mod tests {
     #[test]
     fn basic_insert_test() {
         let mut task_stat = TaskStat::empty_task_stat();
-        task_stat.add_active_task("u".to_string(), "uiae".to_string(), 1.0, 3).unwrap();
-        task_stat.add_pooled_task("i".to_string(), "xvlc".to_string(), 1.0, 0.4,
+        task_stat.add_active_task("u".to_string(), "uiae".to_string(), "".to_string(), 1.0, 3).unwrap();
+        task_stat.add_pooled_task("i".to_string(), "xvlc".to_string(), "".to_string(), 1.0, 0.4,
                                   3, 4).unwrap();
 
         assert_eq!(1, task_stat.active.len());
@@ -538,11 +542,11 @@ mod tests {
         // create a fake ranom generator where we know the results
         let mut rng = default_rng();
         let mut task_stat = TaskStat::empty_task_stat();
-        task_stat.add_pooled_task("task a".to_string(), "".to_string(),
+        task_stat.add_pooled_task("task a".to_string(), "".to_string(), "".to_string(),
                                   1.0, 0.2, 1, 2).unwrap();
-        task_stat.add_pooled_task("task b".to_string(), "".to_string(),
+        task_stat.add_pooled_task("task b".to_string(), "".to_string(), "".to_string(),
                                   1.0, 0.1, 2, 3).unwrap();
-        task_stat.add_pooled_task("task c".to_string(), "".to_string(),
+        task_stat.add_pooled_task("task c".to_string(), "".to_string(), "".to_string(),
                                   1.0, 0.7, 0, 1).unwrap();
         task_stat.activate(&mut rng).unwrap();
         let actives : BTreeMap<String, ActiveTask> = task_stat.active;
@@ -555,9 +559,9 @@ mod tests {
     #[test]
     fn mark_done_test () {
         let mut task_stat = TaskStat::empty_task_stat();
-        task_stat.add_pooled_task("task a".to_string(), "".to_string(),
+        task_stat.add_pooled_task("task a".to_string(), "".to_string(), "".to_string(),
                                   1.0, 0.2, 1, 2).unwrap();
-        task_stat.add_active_task("task a".to_string(), "".to_string(),
+        task_stat.add_active_task("task a".to_string(), "".to_string(), "".to_string(),
                                   1.0, 3).unwrap();
         assert_eq!(false, task_stat.mark_done("task b".to_string()).is_ok());
         assert_eq!(true, task_stat.mark_done("task a".to_string()).is_ok());

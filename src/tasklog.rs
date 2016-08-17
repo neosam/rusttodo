@@ -409,19 +409,20 @@ impl TaskLog {
 impl TaskStatTrait for TaskLog {
     type Error = TaskLogError;
 
-    fn add_active_task(&mut self, title: String, description: String,
+    fn add_active_task(&mut self, title: String, description: String, category: String,
                        factor: f32, due_days: i16) -> Result<ActiveTask, Self::Error> {
         self.state.update_ref_tm();
-        let a_task = try!(self.state.add_active_task(title, description, factor, due_days));
+        let a_task = try!(self.state.add_active_task(title, description, category,
+                                                     factor, due_days));
         try!(self.store_state(TaskAction::ScheduleTask(a_task.clone())));
         Ok(a_task)
     }
 
-    fn add_pooled_task(&mut self, title: String, description: String,
+    fn add_pooled_task(&mut self, title: String, description: String, category: String,
                        factor: f32, propability: f32,
                        cool_down: i16, due_days: i16) -> Result<PooledTask, Self::Error> {
         self.state.update_ref_tm();
-        let p_task = try!(self.state.add_pooled_task(title, description, factor,
+        let p_task = try!(self.state.add_pooled_task(title, description, category, factor,
                                 propability, cool_down, due_days));
         try!(self.store_state(TaskAction::PoolTask(p_task.clone())));
         Ok(p_task)

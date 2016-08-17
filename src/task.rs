@@ -82,9 +82,18 @@ tbd_model!{
         [factor: f32, write_f32, read_f32]
     } {
         title: String,
-        description: String
+        description: String,
+        category: String
     } {
         task_convert
+    }
+}
+tbd_model!{
+    Task2 {
+        [factor: f32, write_f32, read_f32]
+    } {
+        title: String,
+        description: String
     }
 }
 
@@ -103,12 +112,25 @@ impl From<Task1> for Task {
         Task {
             factor: task1.factor,
             title: task1.title,
-            description: task1.description
+            description: task1.description,
+            category: "".to_string()
+        }
+    }
+}
+impl From<Task2> for Task {
+    fn from(task: Task2) -> Task {
+        Task {
+            factor: task.factor,
+            title: task.title,
+            description: task.description,
+            category: "".to_string()
         }
     }
 }
 
-tbd_old_convert_gen!(task_convert, Task1, Task);
+tbd_old_convert_gen!(task_convert_old, Task1, Task);
+tbd_convert_gen!(task_convert_2, Task2, Task);
+tbd_convert_chain!(task_convert, Task, [task_convert_2, task_convert_old]);
 
 
 
@@ -233,9 +255,9 @@ impl ActiveTask {
 pub trait TaskStatTrait {
     type Error: error::Error;
 
-    fn add_active_task(&mut self, title: String, description: String,
+    fn add_active_task(&mut self, title: String, description: String, category: String,
                        factor: f32, due_days: i16) -> Result<ActiveTask, Self::Error>;
-    fn add_pooled_task(&mut self, title: String, description: String,
+    fn add_pooled_task(&mut self, title: String, description: String, category: String,
                        factor: f32, propability: f32,
                        cool_down: i16, due_days: i16) -> Result<PooledTask, Self::Error>;
     fn activate<R: rand::Rng>(&mut self, rng: &mut R) -> Result<Vec<ActiveTask>, Self::Error>;
@@ -381,6 +403,7 @@ impl TaskStatTrait for TaskStat {
     fn add_active_task(&mut self,
                            title: String,
                            description: String,
+                           category: String,
                            factor: f32,
                            due_days: i16) -> Result<ActiveTask, Self::Error> {
         floor_tm_day(&mut self.ref_tm);
@@ -390,7 +413,8 @@ impl TaskStatTrait for TaskStat {
             task: Task {
                 title: title,
                 description: description,
-                factor: factor
+                category: category,
+                factor: factor,
             },
             start: self.ref_tm,
             due: due
@@ -399,7 +423,7 @@ impl TaskStatTrait for TaskStat {
         Ok(a_task)
     }
 
-    fn add_pooled_task(&mut self, title: String, description: String,
+    fn add_pooled_task(&mut self, title: String, description: String, category: String,
                        factor: f32, propability: f32,
                        cool_down: i16, due_days: i16) -> Result<PooledTask, Self::Error> {
         floor_tm_day(&mut self.ref_tm);
@@ -407,6 +431,7 @@ impl TaskStatTrait for TaskStat {
             task: Task {
                 title: title,
                 description: description,
+                category: category,
                 factor: factor
             },
             propability: propability,
